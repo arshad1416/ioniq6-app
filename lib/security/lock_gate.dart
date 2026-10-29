@@ -52,7 +52,7 @@ class _LockGateState extends State<LockGate> {
                   icon: const Icon(Icons.fingerprint, color: Palette.red),
                 ),
                 const SizedBox(height: 12),
-                Text('Tap to unlock', style: Txt.muted(13)),
+                Text('Tap to unlock', style: Txt.muted(15)),
               ],
             ),
           ),

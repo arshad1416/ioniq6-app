@@ -60,7 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: Text('Turn on car commands?', style: Txt.display(22, weight: 400)),
           content: Text(
             'Holding a control will then lock, unlock, start climate or charging on the real car through Home Assistant.',
-            style: Txt.muted(14),
+            style: Txt.muted(16),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -103,8 +103,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       NavRow(icon: icon, label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
 
   Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
-    title: Text(title, style: Txt.body(14)),
-    subtitle: Text(sub, style: Txt.muted(12)),
+    title: Text(title, style: Txt.body(16)),
+    subtitle: Text(sub, style: Txt.muted(14)),
     value: value,
     onChanged: onChanged,
   );
@@ -116,7 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(icon, size: 20, color: Palette.mute),
             const SizedBox(width: 12),
-            Expanded(child: Text(label, style: Txt.body(14))),
+            Expanded(child: Text(label, style: Txt.body(16))),
             SegmentedButton<T>(
               showSelectedIcon: false,
               segments: [for (final (v, l) in options) ButtonSegment(value: v, label: Text(l))],
@@ -231,7 +231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Connection.demo => 'Demo mode',
                       Connection.none => 'Not set up',
                     },
-                style: Txt.muted(12),
+                style: Txt.muted(14),
               ),
             ),
             FilledButton(

@@ -34,7 +34,7 @@ abstract final class Txt {
       _font('InstrumentSans', size, weight, color: color, height: 1.4);
   static TextStyle mono(double size, {int weight = 500, Color color = Palette.mute}) =>
       _font('JetBrainsMono', size, weight, color: color).copyWith(letterSpacing: size * 0.1);
-  static TextStyle label() => mono(11);
+  static TextStyle label() => mono(12);
   static TextStyle muted(double size) => body(size, color: Palette.mute);
 }
 
@@ -76,7 +76,7 @@ ThemeData buildTheme() {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: Palette.ink,
-      contentTextStyle: Txt.body(13, color: const Color(0xFF0A0A0A)),
+      contentTextStyle: Txt.body(15, color: const Color(0xFF0A0A0A)),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     ),

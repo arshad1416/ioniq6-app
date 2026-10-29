@@ -5,9 +5,10 @@ import '../car/commands.dart';
 import '../motion.dart';
 import '../theme.dart';
 import '../widgets/charge_cable.dart';
+import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
+import '../widgets/dock.dart';
 import '../widgets/hold_button.dart';
-import '../widgets/rive_view.dart';
 
 class ChargingScreen extends StatefulWidget {
   const ChargingScreen({super.key});
@@ -36,11 +37,11 @@ class _ChargingScreenState extends State<ChargingScreen> {
           children: [
             Row(
               children: [
-                RollingNumber('$soc%', style: Txt.display(22, weight: 400, color: Palette.red)),
-                const SizedBox(width: 12),
                 Flexible(
                   child: PixelBar(pct: soc, width: 200, limit: limit, pulse: car.charging && car.plugged),
                 ),
+                const SizedBox(width: 10),
+                RollingNumber('$soc%', style: Txt.display(22, weight: 400, color: Palette.red)),
                 if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 20),
               ],
             ),
@@ -49,7 +50,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
               car.charging
                   ? '${duration(car.chargeMinutesLeft ?? 0)} to charge limit'
                   : '${store.settings.units.dist(car.rangeKm) ?? '–'} ${store.settings.units.distance} · ${car.plugged ? 'plugged in' : 'unplugged'}',
-              style: Txt.muted(12),
+              style: Txt.muted(14),
             ),
           ],
         ),
@@ -59,29 +60,33 @@ class _ChargingScreenState extends State<ChargingScreen> {
           aspectRatio: 360 / 170,
           child: Hero(
             tag: 'car',
-            child: RiveView(
-              asset: 'assets/rive/ioniq6_charge.riv',
-              values: {'soc': soc, 'kw': car.chargeKw ?? 0, 'charging': car.charging, 'plugged': car.plugged},
-              fallback: ChargingCar(plugged: car.plugged, charging: car.charging),
-            ),
+            child: ChargingCar(plugged: car.plugged, charging: car.charging),
           ),
+        ),
+        const Row(
+          children: [
+            DockItem(icon: Icons.lock_outline, label: 'Lock', route: '/controls'),
+            DockItem(glyph: ClimateIcon(), label: 'Climate', route: '/climate'),
+            DockItem(icon: Icons.bolt, label: 'Charge', on: true),
+            DockItem(icon: Icons.directions_car_outlined, label: 'Controls', route: '/controls'),
+          ],
         ),
         Panel(
           children: [
             Row(
               children: [
-                Text('Charge limit: $limit%', style: Txt.body(13, weight: 500)),
+                Text('Charge limit: $limit%', style: Txt.body(15, weight: 500)),
                 Flexible(
                   child: Text(
                     car.charging ? ' · Charging' : (car.plugged ? ' · Plugged in' : ' · Unplugged'),
-                    style: Txt.muted(13),
+                    style: Txt.muted(15),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             if (car.charging && car.chargeKw != null)
-              RollingNumber('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(13)),
+              RollingNumber('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(15)),
             // The track thickens while touched, and each 10% step clicks.
             TweenAnimationBuilder<double>(
               tween: Tween(end: _sliding ? 12 : 6),
@@ -142,7 +147,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
             Kv('DC fast charge limit', '${car.dcLimit}%'),
           ],
         ),
-        Text('Start, stop and limit changes need a press and hold.', textAlign: TextAlign.center, style: Txt.muted(11)),
+        Text('Start, stop and limit changes need a press and hold.', textAlign: TextAlign.center, style: Txt.muted(13)),
       ],
     );
   }
@@ -165,7 +170,7 @@ class _SplitButton extends StatelessWidget {
       ),
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Center(child: Text(label, style: Txt.muted(13))),
+        child: Center(child: Text(label, style: Txt.muted(15))),
       ),
     ],
   );
@@ -192,7 +197,7 @@ class _HoldBar extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: Text(label, style: Txt.body(14, weight: 500))),
+            child: Center(child: Text(label, style: Txt.body(16, weight: 500))),
           ),
         ],
       ),

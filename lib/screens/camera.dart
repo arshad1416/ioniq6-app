@@ -44,7 +44,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     child: Text(
                       _tabs[i],
                       textAlign: TextAlign.center,
-                      style: Txt.body(13, weight: 500, color: i == _tab ? Palette.ink : Palette.mute),
+                      style: Txt.body(15, weight: 500, color: i == _tab ? Palette.ink : Palette.mute),
                     ),
                   ),
                 ),
@@ -67,9 +67,9 @@ class _CameraScreenState extends State<CameraScreen> {
                     children: [
                       const Icon(Icons.photo_camera_outlined, color: Palette.mute, size: 30),
                       const SizedBox(height: 8),
-                      Text('No ${_tabs[_tab].toLowerCase()} shots yet', style: Txt.body(14)),
+                      Text('No ${_tabs[_tab].toLowerCase()} shots yet', style: Txt.body(16)),
                       const SizedBox(height: 4),
-                      Text('${_label(_view)} view', style: Txt.muted(12)),
+                      Text('${_label(_view)} view', style: Txt.muted(14)),
                     ],
                   ),
                 ),
@@ -96,7 +96,7 @@ class _CameraScreenState extends State<CameraScreen> {
                     selectedColor: Palette.redDeep,
                     backgroundColor: Palette.raise,
                     side: BorderSide(color: v == _view ? Palette.red : Palette.line),
-                    labelStyle: Txt.body(13, color: v == _view ? Palette.ink : Palette.light),
+                    labelStyle: Txt.body(15, color: v == _view ? Palette.ink : Palette.light),
                   ),
               ],
             ),
@@ -115,7 +115,7 @@ class _CameraScreenState extends State<CameraScreen> {
       ),
       Text(
         'Snapshots need a camera source in Home Assistant. This turns on once one is connected.',
-        style: Txt.muted(11),
+        style: Txt.muted(13),
         textAlign: TextAlign.center,
       ),
     ],

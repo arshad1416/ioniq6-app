@@ -63,7 +63,7 @@ Future<void> _downloadAndInstall(BuildContext context, Updater up, AppRelease re
           children: [
             LinearProgressIndicator(value: p == 0 ? null : p, color: Palette.red, backgroundColor: Palette.unlit),
             const SizedBox(height: 10),
-            Text('${(p * 100).round()}%', style: Txt.muted(12)),
+            Text('${(p * 100).round()}%', style: Txt.muted(14)),
           ],
         ),
       ),
@@ -99,12 +99,12 @@ class _UpdateDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Version ${release.version} is ready. You have $current$mb.', style: Txt.body(14)),
+              Text('Version ${release.version} is ready. You have $current$mb.', style: Txt.body(16)),
               if (release.notes.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 Text('WHAT\'S NEW', style: Txt.label()),
                 const SizedBox(height: 6),
-                Text(release.notes, style: Txt.muted(13)),
+                Text(release.notes, style: Txt.muted(15)),
               ],
             ],
           ),

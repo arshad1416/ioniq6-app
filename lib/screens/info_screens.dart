@@ -60,7 +60,7 @@ class _StatsScreenState extends State<StatsScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
                       snap.connectionState == ConnectionState.waiting ? 'Loading…' : 'No history in Home Assistant yet',
-                      style: Txt.muted(13),
+                      style: Txt.muted(15),
                       textAlign: TextAlign.center,
                     ),
                   );
@@ -120,7 +120,7 @@ class _MonthChart extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(values[i].round().toString(), style: Txt.mono(10, weight: 400)),
+                        Text(values[i].round().toString(), style: Txt.mono(12, weight: 400)),
                         const SizedBox(height: 4),
                         TweenAnimationBuilder(
                           tween: Tween(begin: 0.0, end: values[i] / top),
@@ -153,7 +153,7 @@ class _MonthChart extends StatelessWidget {
                 child: Text(
                   names[(_start(r)?.month ?? 1) - 1],
                   textAlign: TextAlign.center,
-                  style: Txt.mono(10, weight: 400),
+                  style: Txt.mono(12, weight: 400),
                 ),
               ),
           ],
@@ -233,7 +233,7 @@ class _TireMap extends StatelessWidget {
               border: Border.all(color: low ? Palette.amber : Palette.line),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text('$k ${low ? 'low' : 'ok'}', style: Txt.mono(11, color: low ? Palette.amber : Palette.ok)),
+            child: Text('$k ${low ? 'low' : 'ok'}', style: Txt.mono(13, color: low ? Palette.amber : Palette.ok)),
           );
           final lead = Container(width: 14, height: 1, color: Palette.line);
           final edge = left + carW * (onLeft ? _bodyLeft : _bodyRight);
@@ -278,7 +278,7 @@ class ActivityScreen extends StatelessWidget {
     return SubScreen(
       title: 'Activity',
       children: [
-        if (items.isEmpty) Text('Nothing in the last two days.', style: Txt.muted(13)),
+        if (items.isEmpty) Text('Nothing in the last two days.', style: Txt.muted(15)),
         for (final a in items)
           Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -288,13 +288,13 @@ class ActivityScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: 64, child: Text(_when(a.time), style: Txt.mono(11, weight: 400))),
+                SizedBox(width: 64, child: Text(_when(a.time), style: Txt.mono(13, weight: 400))),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(a.title, style: Txt.body(13)),
-                      if (a.detail.isNotEmpty) Text(a.detail, style: Txt.muted(12)),
+                      Text(a.title, style: Txt.body(15)),
+                      if (a.detail.isNotEmpty) Text(a.detail, style: Txt.muted(14)),
                     ],
                   ),
                 ),

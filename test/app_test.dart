@@ -47,6 +47,8 @@ void main() {
   testWidgets('every screen opens from home', (tester) async {
     await pumpApp(tester);
     for (final (row, title) in [('Stats', 'Stats'), ('Health', 'Health'), ('Activity', 'Activity')]) {
+      await tester.ensureVisible(find.text(row).last);
+      await tester.pumpAndSettle();
       await tester.tap(find.text(row).last);
       await tester.pumpAndSettle();
       expect(find.text(title), findsWidgets);

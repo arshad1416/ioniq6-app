@@ -5,18 +5,15 @@ import '../car/commands.dart';
 import '../theme.dart';
 import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
+import '../widgets/dock.dart';
 import '../widgets/hold_button.dart';
+import '../widgets/top_car.dart';
 import 'valet.dart';
 
-/// The overhead photo Arshad picked for this screen, and where things sit on it
-/// as fractions of the image.
-const _photo = 'assets/images/controls_top.webp';
-const _photoSize = Size(768, 1376);
-// Centre of the sunroof glass, which runs from 43% to 55.5% of the photo height.
-const _lockSpot = Offset(.5, .493);
-const _portSpot = Offset(.735, .76);
-// On the rear spoiler, where the high brake light runs across.
-const _trunkSpot = Offset(.5, .776);
+// Where things sit on the overhead car, as fractions of its box (from the mockup).
+const _lockSpot = Offset(.467, .47);
+const _portSpot = Offset(.96, .82);
+const _trunkSpot = Offset(.467, .885);
 
 class ControlsScreen extends StatelessWidget {
   const ControlsScreen({super.key});
@@ -31,93 +28,66 @@ class ControlsScreen extends StatelessWidget {
     return SubScreen(
       title: 'Controls',
       scroll: false,
-      background: LayoutBuilder(
-        builder: (context, box) {
-          // Same maths as BoxFit.cover, so overlays land on the right part of the car.
-          final scale = [
-            box.maxWidth / _photoSize.width,
-            box.maxHeight / _photoSize.height,
-          ].reduce((a, b) => a > b ? a : b);
-          final shown = _photoSize * scale;
-          final origin = Offset((box.maxWidth - shown.width) / 2, (box.maxHeight - shown.height) / 2);
-
-          Widget place(Offset f, double size, Widget child) {
-            final p = origin + Offset(f.dx * shown.width, f.dy * shown.height);
-            return Positioned(left: p.dx - size / 2, top: p.dy - size / 2, width: size, height: size, child: child);
-          }
-
-          return Stack(
-            children: [
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF28292C), Color(0xFF161618)],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: Hero(
-                  tag: 'car',
-                  child: Image.asset(_photo, fit: BoxFit.cover, semanticLabel: 'Your Ioniq 6 from above'),
-                ),
-              ),
-              place(
-                _trunkSpot,
-                80,
-                Center(
-                  child: Text(
-                    'Trunk',
-                    style: Txt.body(
-                      14,
-                      weight: 500,
-                      color: const Color(0xFFF2F2F2),
-                    ).copyWith(shadows: const [Shadow(blurRadius: 6)]),
-                  ),
-                ),
-              ),
-              place(
-                _lockSpot,
-                104,
-                HoldButton(
-                  enabled: store.pending == null,
-                  onHeld: () => runCommand(context, locked ? const UnlockCommand() : const LockCommand()),
-                  // Not ioniq6_lock.riv: that file now draws a whole car, which
-                  // showed up as a car inside the sunroof.
-                  builder: (context, p) => Center(
-                    child: HoldRing(
-                      progress: p,
-                      size: 60,
-                      child: Icon(
-                        locked ? Icons.lock_outline : Icons.lock_open,
-                        size: 30,
-                        color: locked ? Palette.ink : Palette.red,
-                        shadows: const [Shadow(blurRadius: 6)],
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, box) => Center(
+              child: TopCar(
+                height: box.maxHeight.clamp(0, 520).toDouble(),
+                spots: [
+                  CarSpot(
+                    _trunkSpot,
+                    const Size(90, 24),
+                    Center(
+                      child: Text(
+                        'Trunk',
+                        style: Txt.body(
+                          16,
+                          weight: 500,
+                          color: const Color(0xFFD9D9DB),
+                        ).copyWith(shadows: const [Shadow(blurRadius: 4)]),
                       ),
                     ),
                   ),
-                ),
-              ),
-              place(
-                _portSpot,
-                48,
-                HoldButton(
-                  onHeld: () => runCommand(context, const OpenChargePortCommand()),
-                  builder: (context, p) => HoldRing(
-                    progress: p,
-                    child: const Icon(Icons.bolt, color: Color(0xFFE6E6E8), size: 26, shadows: [Shadow(blurRadius: 6)]),
+                  CarSpot(
+                    _lockSpot,
+                    const Size.square(56),
+                    HoldButton(
+                      enabled: store.pending == null,
+                      onHeld: () => runCommand(context, locked ? const UnlockCommand() : const LockCommand()),
+                      builder: (context, p) => HoldRing(
+                        progress: p,
+                        size: 48,
+                        child: Icon(
+                          locked ? Icons.lock_outline : Icons.lock_open,
+                          size: 28,
+                          color: locked ? const Color(0xFFE6E6E8) : Palette.red,
+                          shadows: const [Shadow(blurRadius: 3)],
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  CarSpot(
+                    _portSpot,
+                    const Size.square(48),
+                    HoldButton(
+                      onHeld: () => runCommand(context, const OpenChargePortCommand()),
+                      builder: (context, p) => HoldRing(
+                        progress: p,
+                        child: const Icon(
+                          Icons.bolt,
+                          color: Color(0xFFE6E6E8),
+                          size: 28,
+                          shadows: [Shadow(blurRadius: 3)],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          );
-        },
-      ),
-      children: [
-        const Spacer(),
+            ),
+          ),
+        ),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 6,
@@ -132,19 +102,14 @@ class ControlsScreen extends StatelessWidget {
           ],
         ),
         const _ValetSwitch(),
-        Text(
-          'Hold the lock to ${locked ? 'unlock' : 'lock'} · hold the bolt to open the charge port',
-          textAlign: TextAlign.center,
-          style: Txt.muted(11),
-        ),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              _Dock(icon: Icons.highlight, label: 'Flash', command: const FlashCommand()),
-              _Dock(icon: Icons.campaign_outlined, label: 'Honk', command: const HonkCommand()),
-              _Dock(glyph: const ClimateIcon(), label: 'Climate', route: '/climate'),
-              _Dock(icon: Icons.place_outlined, label: 'Find', onTap: () => _find(context)),
+              DockItem(icon: Icons.highlight, label: 'Flash', command: const FlashCommand()),
+              DockItem(icon: Icons.campaign_outlined, label: 'Honk', command: const HonkCommand()),
+              DockItem(glyph: const ClimateIcon(), label: 'Climate', route: '/climate'),
+              DockItem(icon: Icons.place_outlined, label: 'Find', onTap: () => _find(context)),
             ],
           ),
         ),
@@ -162,47 +127,6 @@ class ControlsScreen extends StatelessWidget {
               : 'Car is at ${loc.$1.toStringAsFixed(5)}, ${loc.$2.toStringAsFixed(5)}',
         ),
       ),
-    );
-  }
-}
-
-class _Dock extends StatelessWidget {
-  const _Dock({this.icon, this.glyph, required this.label, this.command, this.route, this.onTap});
-  final IconData? icon;
-  final Widget? glyph;
-  final String label;
-  final CarCommand? command;
-  final String? route;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget item(double p) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        children: [
-          HoldRing(
-            progress: p,
-            size: 36,
-            child: IconTheme(
-              data: const IconThemeData(color: Palette.light, size: 26),
-              child: glyph ?? Icon(icon),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: Txt.muted(12), maxLines: 1, overflow: TextOverflow.fade, softWrap: false),
-        ],
-      ),
-    );
-    final cmd = command;
-    return Expanded(
-      child: cmd != null
-          ? HoldButton(onHeld: () => runCommand(context, cmd), builder: (context, p) => item(p))
-          : InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onTap ?? () => Navigator.pushNamed(context, route!),
-              child: item(0),
-            ),
     );
   }
 }
@@ -231,10 +155,10 @@ class _ValetSwitch extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Valet mode', style: Txt.body(14)),
+                Text('Valet mode', style: Txt.body(16)),
                 Text(
                   'Limit ${v.speedLimitKmh} km/h · ${v.pinSet ? 'PIN set' : 'No PIN'}',
-                  style: Txt.muted(11),
+                  style: Txt.muted(13),
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

@@ -46,7 +46,7 @@ class SubScreen extends StatelessWidget {
                     child: TextButton(
                       onPressed: () => Navigator.of(context).maybePop(),
                       style: TextButton.styleFrom(foregroundColor: Palette.mute),
-                      child: Text('‹ IONIQ 6', style: Txt.body(14, color: Palette.mute)),
+                      child: Text('‹ IONIQ 6', style: Txt.body(16, color: Palette.mute)),
                     ),
                   ),
                   Text(title, style: Txt.display(22, weight: 400)),
@@ -101,14 +101,14 @@ class Kv extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      Expanded(flex: 3, child: Text(k, style: Txt.muted(13))),
+      Expanded(flex: 3, child: Text(k, style: Txt.muted(15))),
       const SizedBox(width: 12),
       Expanded(
         flex: 2,
         child: Text(
           v,
           textAlign: TextAlign.end,
-          style: Txt.body(13, weight: 500).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+          style: Txt.body(15, weight: 500).copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
         ),
       ),
     ],
@@ -134,7 +134,7 @@ class StatusChip extends StatelessWidget {
       color: ok ? Palette.okDeep : const Color(0xFF33260F),
       borderRadius: BorderRadius.circular(999),
     ),
-    child: Text(text, style: Txt.body(12, color: ok ? Palette.ok : Palette.amber)),
+    child: Text(text, style: Txt.body(14, color: ok ? Palette.ok : Palette.amber)),
   );
 }
 
@@ -165,8 +165,8 @@ class NavRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: Txt.body(14)),
-                if (sub != null) Text(sub!, style: Txt.muted(12)),
+                Text(label, style: Txt.body(16)),
+                if (sub != null) Text(sub!, style: Txt.muted(14)),
               ],
             ),
           ),
@@ -175,7 +175,7 @@ class NavRow extends StatelessWidget {
               flex: 4,
               child: Text(
                 value!,
-                style: Txt.muted(12),
+                style: Txt.muted(14),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.end,

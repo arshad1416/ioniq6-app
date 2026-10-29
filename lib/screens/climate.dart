@@ -5,7 +5,7 @@ import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
-import '../widgets/rive_view.dart';
+import '../widgets/top_car.dart';
 
 class ClimateScreen extends StatelessWidget {
   const ClimateScreen({super.key});
@@ -17,8 +17,6 @@ class ClimateScreen extends StatelessWidget {
     final req = store.settings.climate;
     final on = car.climateOn;
     final cabin = car.cabinTempC;
-    final heating = req.tempC >= (cabin ?? 15);
-    final progress = cabin == null || !on ? 0.0 : (1 - ((req.tempC - cabin).abs() / 12)).clamp(0.0, 1.0);
 
     return SubScreen(
       title: 'Climate',
@@ -27,11 +25,6 @@ class ClimateScreen extends StatelessWidget {
         Expanded(
           child: _Cabin(
             req: req,
-            rive: RiveView(
-              asset: 'assets/rive/ioniq6_climate.riv',
-              values: {'on': on, 'mode': heating ? 1 : 0, 'progress': progress},
-              fallback: const SizedBox.shrink(),
-            ),
             onDriver: () => store.updateClimate(req.copyWith(driverSeat: req.driverSeat.next)),
             onPassenger: () => store.updateClimate(req.copyWith(passengerSeat: req.passengerSeat.next)),
           ),
@@ -52,7 +45,7 @@ class ClimateScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   cabin == null ? 'Cabin temperature not reported' : 'Inside ${store.settings.units.temp(cabin)}',
-                  style: Txt.muted(11),
+                  style: Txt.muted(13),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -75,7 +68,7 @@ class ClimateScreen extends StatelessWidget {
                                   : on
                                   ? 'On'
                                   : 'Off',
-                              style: Txt.muted(11),
+                              style: Txt.muted(13),
                             ),
                           ],
                         ),
@@ -119,7 +112,7 @@ class ClimateScreen extends StatelessWidget {
                           children: [
                             Icon(Icons.trip_origin, size: 28, color: req.wheel ? Palette.red : Palette.light),
                             const SizedBox(height: 6),
-                            Text('Wheel', style: Txt.muted(11)),
+                            Text('Wheel', style: Txt.muted(13)),
                           ],
                         ),
                       ),
@@ -138,7 +131,7 @@ class ClimateScreen extends StatelessWidget {
                   on
                       ? 'Hold the power button to stop.'
                       : 'Hold the power button to start. Runs ${req.minutes} min with these settings.',
-                  style: Txt.muted(11),
+                  style: Txt.muted(13),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -171,120 +164,109 @@ class _Wide extends StatelessWidget {
         children: [
           icon(on ? Palette.red : Palette.light),
           const SizedBox(width: 14),
-          Text(label, style: Txt.body(14)),
+          Text(label, style: Txt.body(16)),
         ],
       ),
     ),
   );
 }
 
-/// The cabin from above. The front seats sit under a smoked-glass pane, like
-/// the panoramic roof, and a heated seat glows red beneath it.
+/// The car from above, as in the mockup: the front seats show through the
+/// smoked panoramic roof, and a heated seat glows red beneath it.
 class _Cabin extends StatelessWidget {
-  const _Cabin({required this.req, required this.rive, required this.onDriver, required this.onPassenger});
+  const _Cabin({required this.req, required this.onDriver, required this.onPassenger});
   final ClimateRequest req;
-  final Widget rive;
   final VoidCallback onDriver, onPassenger;
 
-  // Measured on top_v.webp (237×560) as fractions of the image.
-  static const _aspect = 237 / 560;
-  static const _seatY = .553, _driverX = .292, _passengerX = .708;
-  static const _glass = Rect.fromLTRB(.15, .466, .85, .632);
+  // Fractions of the overhead car's box, from the mockup.
+  static const _driver = Offset(.335, .46), _passenger = Offset(.60, .46);
+  static const _glass = Rect.fromLTWH(.22, .375, .495, .195);
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) {
-      // Same maths as BoxFit.contain, so the overlays land on the seats.
-      final h = box.maxHeight.clamp(0.0, box.maxWidth / _aspect);
-      final img = Rect.fromCenter(center: box.biggest.center(Offset.zero), width: h * _aspect, height: h);
-      Offset at(double x, double y) => Offset(img.left + img.width * x, img.top + img.height * y);
-      final glass = Rect.fromPoints(at(_glass.left, _glass.top), at(_glass.right, _glass.bottom));
-
-      Widget seat(SeatLevel level, VoidCallback onTap, double x, String label) {
-        final c = at(x, _seatY);
-        final heated = level != SeatLevel.off;
-        return Positioned(
-          left: c.dx - 30,
-          top: c.dy - 30,
-          width: 60,
-          height: 60,
-          child: Semantics(
-            label: '$label seat heat ${level.name}',
-            button: true,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onTap,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedOpacity(
-                    opacity: heated ? 1 : 0,
-                    duration: Motion.nav,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          colors: [
-                            Palette.red.withValues(alpha: .25 + .15 * level.index),
-                            Colors.transparent,
-                          ],
-                        ),
+  Widget build(BuildContext context) {
+    CarSpot seat(SeatLevel level, VoidCallback onTap, Offset at, String label) {
+      final heated = level != SeatLevel.off;
+      return CarSpot(
+        at,
+        const Size.square(52),
+        Semantics(
+          label: '$label seat heat ${level.name}',
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AnimatedOpacity(
+                  opacity: heated ? 1 : 0,
+                  duration: Motion.nav,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          Palette.red.withValues(alpha: .25 + .1 * level.index),
+                          Colors.transparent,
+                        ],
+                        stops: const [0, .7],
                       ),
-                      child: const SizedBox.expand(),
                     ),
+                    child: const SizedBox.expand(),
                   ),
-                  Icon(Icons.waves, size: 24, color: heated ? Palette.red : const Color(0xFF9A9A9E)),
-                  Positioned(
-                    bottom: 8,
-                    child: Text(level.badge, style: Txt.mono(9, weight: 600, color: Palette.red)),
+                ),
+                Opacity(
+                  opacity: .8,
+                  // Upright waves: the heated-seat symbol.
+                  child: RotatedBox(
+                    quarterTurns: 1,
+                    child: Icon(Icons.waves, size: 24, color: heated ? Palette.red : const Color(0xFF9A9A9E)),
                   ),
-                ],
-              ),
+                ),
+                Positioned(
+                  bottom: 4,
+                  child: Text(level.badge, style: Txt.mono(11, weight: 600, color: Palette.red)),
+                ),
+              ],
             ),
           ),
-        );
-      }
+        ),
+      );
+    }
 
-      return Stack(
-        children: [
-          Positioned.fromRect(
-            rect: img,
-            child: Hero(
-              tag: 'car',
-              child: Image.asset('assets/images/top_v.webp', fit: BoxFit.fill, semanticLabel: 'Cabin from above'),
-            ),
-          ),
-          seat(req.driverSeat, onDriver, _driverX, 'Driver'),
-          seat(req.passengerSeat, onPassenger, _passengerX, 'Passenger'),
-          // Smoked glass with a light sheen, over the seats but not their taps.
-          Positioned.fromRect(
-            rect: glass,
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Colors.white.withValues(alpha: .14),
-                      const Color(0xFF0B0B0C).withValues(alpha: .35),
-                      const Color(0xFF0B0B0C).withValues(alpha: .45),
-                      Colors.white.withValues(alpha: .06),
-                    ],
-                    stops: const [0, .35, .8, 1],
+    return LayoutBuilder(
+      builder: (context, box) => Center(
+        child: TopCar(
+          height: box.maxHeight.clamp(0, 460).toDouble(),
+          spots: [
+            seat(req.driverSeat, onDriver, _driver, 'Driver'),
+            seat(req.passengerSeat, onPassenger, _passenger, 'Passenger'),
+            // Smoked glass with a sheen, over the seats but not their taps.
+            CarSpot.area(
+              _glass,
+              IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    gradient: LinearGradient(
+                      begin: const Alignment(-.42, -1),
+                      end: const Alignment(.42, 1),
+                      colors: [
+                        Colors.white.withValues(alpha: .13),
+                        Colors.white.withValues(alpha: .02),
+                        const Color(0xFF080A0E).withValues(alpha: .38),
+                        Colors.white.withValues(alpha: .06),
+                      ],
+                      stops: const [0, .35, .6, 1],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Center(
-            child: IgnorePointer(child: SizedBox.square(dimension: 160, child: rive)),
-          ),
-        ],
-      );
-    },
-  );
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// The standard defrost symbol: a window with three wavy arrows rising through it.

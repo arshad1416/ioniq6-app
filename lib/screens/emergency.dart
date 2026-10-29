@@ -28,7 +28,7 @@ class EmergencyScreen extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: Palette.red,
             padding: const EdgeInsets.symmetric(vertical: 18),
-            textStyle: Txt.body(17, weight: 600),
+            textStyle: Txt.body(19, weight: 600),
           ),
         ),
         RowsCard(
@@ -62,7 +62,7 @@ class EmergencyScreen extends StatelessWidget {
         ),
         Text(
           'Call 911 and Roadside open your phone\'s dialer. Nothing is called until you press call there.',
-          style: Txt.muted(11),
+          style: Txt.muted(13),
           textAlign: TextAlign.center,
         ),
       ],

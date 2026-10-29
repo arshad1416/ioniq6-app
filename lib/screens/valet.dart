@@ -21,7 +21,7 @@ class ValetScreen extends StatelessWidget {
     Widget locked(String title, bool value) => Opacity(
       opacity: .5,
       child: SwitchListTile(
-        title: Text(title, style: Txt.body(14)),
+        title: Text(title, style: Txt.body(16)),
         value: value,
         onChanged: null,
       ),
@@ -34,15 +34,15 @@ class ValetScreen extends StatelessWidget {
           decoration: BoxDecoration(color: Palette.redDeep, borderRadius: BorderRadius.circular(14)),
           child: Text(
             'These settings are saved in the car through Bluelink. Home Assistant can\'t do that yet, so they\'re locked for now.',
-            style: Txt.body(13),
+            style: Txt.body(15),
           ),
         ),
         Panel(
           children: [
             Row(
               children: [
-                Expanded(child: Text('Speed limit', style: Txt.body(14, weight: 500))),
-                Text('${v.speedLimitKmh} km/h', style: Txt.body(14, weight: 500, color: Palette.red)),
+                Expanded(child: Text('Speed limit', style: Txt.body(16, weight: 500))),
+                Text('${v.speedLimitKmh} km/h', style: Txt.body(16, weight: 500, color: Palette.red)),
               ],
             ),
             Slider(
@@ -56,8 +56,8 @@ class ValetScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('40', style: Txt.muted(11)),
-                Text('120 km/h', style: Txt.muted(11)),
+                Text('40', style: Txt.muted(13)),
+                Text('120 km/h', style: Txt.muted(13)),
               ],
             ),
           ],

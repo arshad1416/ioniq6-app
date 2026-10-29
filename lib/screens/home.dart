@@ -46,7 +46,7 @@ class HomeScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Flexible(
-                              child: Text(_subline(store), style: Txt.muted(13), overflow: TextOverflow.ellipsis),
+                              child: Text(_subline(store), style: Txt.muted(15), overflow: TextOverflow.ellipsis),
                             ),
                           ],
                         ),
@@ -75,11 +75,11 @@ class HomeScreen extends StatelessWidget {
               Row(
                 children: [
                   RollingNumber('${units.dist(car.rangeKm) ?? '–'}', style: Txt.display(34)),
-                  Text(' ${units.distance}', style: Txt.display(15)),
+                  Text(' ${units.distance}', style: Txt.display(17)),
                   const SizedBox(width: 12),
                   Flexible(child: PixelBar(pct: soc)),
                   const SizedBox(width: 12),
-                  RollingNumber('$soc%', style: Txt.display(15)),
+                  RollingNumber('$soc%', style: Txt.display(17)),
                   if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 18),
                 ],
               ),
@@ -139,7 +139,7 @@ class HomeScreen extends StatelessWidget {
                   car.lastUpdated == null
                       ? 'Waiting for Home Assistant'
                       : 'Car reported ${ago(car.lastUpdated)} · via Home Assistant',
-                  style: Txt.muted(11),
+                  style: Txt.muted(13),
                 ),
               ),
             ],
@@ -182,8 +182,8 @@ class _Banner extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(text, style: Txt.body(13, color: Palette.ink)),
-        if (detail != null) Text(detail!, style: Txt.muted(12), maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(text, style: Txt.body(15, color: Palette.ink)),
+        if (detail != null) Text(detail!, style: Txt.muted(14), maxLines: 2, overflow: TextOverflow.ellipsis),
       ],
     ),
   );
@@ -307,7 +307,7 @@ class _Qa extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: Txt.body(11, color: on ? Palette.red : Palette.mute),
+              style: Txt.body(13, color: on ? Palette.red : Palette.mute),
               overflow: TextOverflow.ellipsis,
             ),
           ],

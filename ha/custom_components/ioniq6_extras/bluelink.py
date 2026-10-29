@@ -80,22 +80,41 @@ class Bluelink:
         self._vm.check_and_refresh_token()
         token = self._vm.token
         headers = dict(self._api.API_HEADERS)  # never mutate the shared dict
+        # The library's own commands write these into its shared headers; a
+        # stale one makes Bluelink reject the next call.
+        for stale in ("pAuth", "transactionId", "accessToken", "vehicleId"):
+            headers.pop(stale, None)
         headers["offset"] = str(int(datetime.now().astimezone().utcoffset().total_seconds() // 3600))
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = self._vehicle.id
         if pin:
-            headers["pAuth"] = self._api._get_pin_token(token, self._vehicle)
+            headers["pAuth"] = self._pin_token(headers)
         return headers
+
+    def _pin_token(self, headers: dict[str, str]) -> str:
+        """vrfypin: trades the PIN for the pAuth token that commands need."""
+        response = self._api.sessions.post(
+            self._api.API_URL + "vrfypin", headers=headers, json={"pin": self._vm.token.pin}
+        )
+        data = self._check(_json(response))
+        pauth = (data.get("result") or {}).get("pAuth")
+        if not pauth:
+            raise BluelinkError("Bluelink didn't accept the PIN")
+        return pauth
+
+    @staticmethod
+    def _check(data: dict[str, Any]) -> dict[str, Any]:
+        header = data.get("responseHeader") or {}
+        if header.get("responseCode") == 1 or "error" in data and data["error"]:
+            error = data.get("error") or {}
+            code = str(error.get("errorCode", ""))
+            _LOGGER.warning("Bluelink error %s: %s", code, error.get("errorDesc"))
+            raise BluelinkError(SVM_LIMIT_ERRORS.get(code) or error.get("errorDesc") or f"Bluelink error {code}")
+        return data
 
     def _post(self, path: str, *, pin: bool = False, body: dict[str, Any] | None = None):
         response = self._api.sessions.post(self._api.API_URL + path, headers=self._headers(pin), json=body or {})
-        data = response.json()
-        header = data.get("responseHeader") or {}
-        if header.get("responseCode") == 1:
-            error = data.get("error") or {}
-            code = str(error.get("errorCode", ""))
-            raise BluelinkError(SVM_LIMIT_ERRORS.get(code) or error.get("errorDesc") or f"Bluelink error {code}")
-        return data, response.headers
+        return self._check(_json(response)), response.headers
 
     # Location ---------------------------------------------------------------
 
@@ -170,7 +189,7 @@ class Bluelink:
     def request_svm(self) -> None:
         """Asks the car to take new 360 shots. A car command with daily and
         monthly limits; only ever called from the take_360_shots service."""
-        self._api._get_pin_token(self._vm.token, self._vehicle)  # the app checks the PIN first
+        self._pin_token(self._headers(pin=False))  # the app checks the PIN first
         self._post("rfc/fndmcrsvm")
 
     def last_svm(self) -> SvmShots | None:
@@ -186,6 +205,18 @@ class Bluelink:
         if not image or len(size) < 6:
             return None
         return SvmShots(images=split_svm(image, size), taken=_parse_time(latest), raw=_without_image(latest))
+
+
+def _json(response: Any) -> dict[str, Any]:
+    """The reply's JSON; some commands (like rfc/fndmcrsvm) answer with an empty body."""
+    try:
+        data = response.json()
+    except ValueError:
+        status = getattr(response, "status_code", 200)
+        if status < 400:
+            return {}
+        raise BluelinkError(f"Bluelink answered HTTP {status}") from None
+    return data if isinstance(data, dict) else {}
 
 
 def split_svm(image_b64: str, size: list[Any]) -> dict[str, bytes]:

@@ -117,6 +117,9 @@ class Extras(DataUpdateCoordinator[Snapshot]):
             await self.hass.async_add_executor_job(self.bluelink.request_svm)
         except BluelinkError as err:
             raise HomeAssistantError(str(err)) from err
+        except Exception as err:
+            _LOGGER.exception("Taking 360 shots failed")
+            raise HomeAssistantError(f"Taking 360 shots failed: {err!r}") from err
         # Nothing tells us when the car has uploaded them; look again shortly.
         for delay in (60, 150, 300):
             async_call_later(self.hass, delay, self._refresh_later)

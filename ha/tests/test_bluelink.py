@@ -15,12 +15,16 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).parents[1] / "custom_components" / "ioniq6_extras"))
 import bluelink  # noqa: E402
 
+OK = {"responseHeader": {"responseCode": 0}}
+
 
 class FakeResponse:
-    def __init__(self, body, headers=None):
-        self._body, self.headers = body, headers or {}
+    def __init__(self, body, headers=None, status_code=200):
+        self._body, self.headers, self.status_code = body, headers or {}, status_code
 
     def json(self):
+        if self._body is None:
+            raise ValueError("no JSON")
         return self._body
 
 
@@ -38,12 +42,9 @@ class FakeApi:
         answer = self.answers[path]
         return answer if isinstance(answer, FakeResponse) else FakeResponse(answer)
 
-    def _get_pin_token(self, token, vehicle):
-        return "PAUTH"
-
 
 def make(answers):
-    api = FakeApi(answers)
+    api = FakeApi({"vrfypin": {**OK, "result": {"pAuth": "PAUTH"}}, **answers})
     vm = SimpleNamespace(
         api=api,
         token=SimpleNamespace(access_token="AT", pin="1234"),
@@ -54,14 +55,11 @@ def make(answers):
     return bluelink.Bluelink(vm, "v1"), api
 
 
-OK = {"responseHeader": {"responseCode": 0}}
-
-
 def test_locate_uses_ev_call_with_pin_header():
     b, api = make({"evc/fme": {**OK, "result": {"coord": {"lat": 43.7, "lon": -79.4}, "head": 90}}})
     loc = b.locate()
     assert (loc.lat, loc.lon, loc.heading) == (43.7, -79.4, 90)
-    path, headers, _ = api.calls[0]
+    path, headers, _ = api.calls[1]
     assert path == "evc/fme" and headers["pAuth"] == "PAUTH" and headers["vehicleId"] == "REGID"
     assert FakeApi.API_HEADERS.get("pAuth") is None  # shared headers untouched
 
@@ -81,7 +79,7 @@ def test_valet_status(mode, on):
 def test_valet_activate_waits_for_the_car():
     b, api = make({"valet/activate": FakeResponse(OK, {"transactionId": "T1"})})
     b.set_valet(True)
-    assert api.calls[0][0] == "valet/activate" and api.calls[0][1]["pAuth"] == "PAUTH"
+    assert api.calls[1][0] == "valet/activate" and api.calls[1][1]["pAuth"] == "PAUTH"
 
 
 def test_svm_limit_error_is_readable():
@@ -114,5 +112,27 @@ def test_last_svm_splits_strip():
 def test_preconditioning_on_uses_pin():
     b, api = make({"evc/prcndtngon": FakeResponse(OK, {"transactionId": "T2"})})
     b.set_preconditioning(True)
-    path, headers, body = api.calls[0]
+    path, headers, body = api.calls[1]
     assert path == "evc/prcndtngon" and headers["pAuth"] == "PAUTH" and body == {"pin": "1234"}
+
+
+def test_pin_error_is_readable():
+    err = {"responseHeader": {"responseCode": 1}, "error": {"errorCode": "7404", "errorDesc": "Invalid PIN"}}
+    b, api = make({"vrfypin": err, "rfc/fndmcrsvm": OK})
+    with pytest.raises(bluelink.BluelinkError, match="Invalid PIN"):
+        b.request_svm()
+    assert [c[0] for c in api.calls] == ["vrfypin"]
+
+
+def test_request_svm_accepts_empty_reply():
+    b, api = make({"rfc/fndmcrsvm": FakeResponse(None)})
+    b.request_svm()
+    path, headers, body = api.calls[0]
+    assert (path, body) == ("vrfypin", {"pin": "1234"}) and headers["accessToken"] == "AT"
+    assert api.calls[1][0] == "rfc/fndmcrsvm" and "pAuth" not in api.calls[1][1]
+
+
+def test_http_error_without_json_is_readable():
+    b, _ = make({"valet/lastvaletstatus": FakeResponse(None, status_code=502)})
+    with pytest.raises(bluelink.BluelinkError, match="HTTP 502"):
+        b.valet_status()

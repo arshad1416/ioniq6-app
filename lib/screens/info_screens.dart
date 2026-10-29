@@ -170,42 +170,9 @@ class HealthScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final car = AppScope.of(context).car;
-    final tires = car.tireWarnings;
-    Widget tire(String k, Alignment a) => Align(
-      alignment: a,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: Palette.raise,
-          border: Border.all(color: Palette.line),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          '$k ${tires[k] == true ? 'low' : 'ok'}',
-          style: Txt.mono(11, color: tires[k] == true ? Palette.amber : Palette.ok),
-        ),
-      ),
-    );
     return SubScreen(
       title: 'Health',
       children: [
-        SizedBox(
-          height: 230,
-          child: Stack(
-            children: [
-              Center(
-                child: Hero(
-                  tag: 'car',
-                  child: RotatedBox(quarterTurns: 1, child: Image.asset('assets/images/top.webp', fit: BoxFit.contain)),
-                ),
-              ),
-              tire('FL', const Alignment(-.85, -.7)),
-              tire('FR', const Alignment(.85, -.7)),
-              tire('RL', const Alignment(-.85, .7)),
-              tire('RR', const Alignment(.85, .7)),
-            ],
-          ),
-        ),
         Wrap(
           spacing: 6,
           runSpacing: 6,
@@ -226,9 +193,73 @@ class HealthScreen extends StatelessWidget {
             if (car.nextServiceKm != null) Kv('Next service (Bluelink)', 'at ${thousands(car.nextServiceKm)} km'),
           ],
         ),
+        const Lbl('Tires'),
+        _TireMap(warnings: car.tireWarnings),
       ],
     );
   }
+}
+
+/// The car from above with each tire's status beside its wheel.
+class _TireMap extends StatelessWidget {
+  const _TireMap({required this.warnings});
+  final Map<String, bool> warnings;
+
+  // Where things sit in top.webp once turned upright (front at the top), as
+  // fractions of the image: the body's sides and the two axles.
+  static const _bodyLeft = .24, _bodyRight = .76, _frontAxle = .217, _rearAxle = .743;
+  static const _height = 300.0, _aspect = 750 / 1200;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: _height,
+    child: LayoutBuilder(
+      builder: (context, box) {
+        const carW = _height * _aspect;
+        final left = (box.maxWidth - carW) / 2;
+        Widget badge(String k, double axle, bool onLeft) {
+          final low = warnings[k] == true;
+          final chip = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: Palette.raise,
+              border: Border.all(color: low ? Palette.amber : Palette.line),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text('$k ${low ? 'low' : 'ok'}', style: Txt.mono(11, color: low ? Palette.amber : Palette.ok)),
+          );
+          final lead = Container(width: 14, height: 1, color: Palette.line);
+          final edge = left + carW * (onLeft ? _bodyLeft : _bodyRight);
+          return Positioned(
+            top: _height * axle - 12,
+            height: 24,
+            left: onLeft ? null : edge + 4,
+            right: onLeft ? box.maxWidth - edge + 4 : null,
+            child: Row(mainAxisSize: MainAxisSize.min, children: onLeft ? [chip, lead] : [lead, chip]),
+          );
+        }
+
+        return Stack(
+          children: [
+            Positioned(
+              left: left,
+              width: carW,
+              top: 0,
+              bottom: 0,
+              child: Hero(
+                tag: 'car',
+                child: RotatedBox(quarterTurns: 1, child: Image.asset('assets/images/top.webp', fit: BoxFit.contain)),
+              ),
+            ),
+            badge('FL', _frontAxle, true),
+            badge('FR', _frontAxle, false),
+            badge('RL', _rearAxle, true),
+            badge('RR', _rearAxle, false),
+          ],
+        );
+      },
+    ),
+  );
 }
 
 class ActivityScreen extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../car/commands.dart';
 import '../motion.dart';
 import '../theme.dart';
+import '../widgets/charge_cable.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
 import '../widgets/rive_view.dart';
@@ -35,9 +36,11 @@ class _ChargingScreenState extends State<ChargingScreen> {
           children: [
             Row(
               children: [
-                _Battery(soc),
-                const SizedBox(width: 8),
                 RollingNumber('$soc%', style: Txt.display(22, weight: 400, color: Palette.red)),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: PixelBar(pct: soc, width: 200, limit: limit, pulse: car.charging && car.plugged),
+                ),
                 if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 20),
               ],
             ),
@@ -50,20 +53,16 @@ class _ChargingScreenState extends State<ChargingScreen> {
             ),
           ],
         ),
-        SizedBox(
-          height: 160,
+        // The car with the connector in its port and the cable to the ground
+        // when plugged in; dashes flow along the cable while charging.
+        AspectRatio(
+          aspectRatio: 360 / 170,
           child: Hero(
             tag: 'car',
-            child: Image.asset('assets/images/car.webp', fit: BoxFit.contain),
-          ),
-        ),
-        AspectRatio(
-          aspectRatio: 373 / 72,
-          child: RiveView(
-            asset: 'assets/rive/ioniq6_charge.riv',
-            values: {'soc': soc, 'kw': car.chargeKw ?? 0, 'charging': car.charging, 'plugged': car.plugged},
-            fallback: Center(
-              child: PixelBar(pct: soc, width: double.infinity, limit: limit),
+            child: RiveView(
+              asset: 'assets/rive/ioniq6_charge.riv',
+              values: {'soc': soc, 'kw': car.chargeKw ?? 0, 'charging': car.charging, 'plugged': car.plugged},
+              fallback: ChargingCar(plugged: car.plugged, charging: car.charging),
             ),
           ),
         ),
@@ -147,31 +146,6 @@ class _ChargingScreenState extends State<ChargingScreen> {
       ],
     );
   }
-}
-
-class _Battery extends StatelessWidget {
-  const _Battery(this.soc);
-  final int soc;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Container(
-        width: 40,
-        height: 18,
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(color: Palette.unlit, borderRadius: BorderRadius.circular(4)),
-        alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          widthFactor: soc / 100,
-          child: Container(
-            decoration: BoxDecoration(color: Palette.red, borderRadius: BorderRadius.circular(2)),
-          ),
-        ),
-      ),
-      Container(width: 2, height: 6, color: Palette.unlit),
-    ],
-  );
 }
 
 class _SplitButton extends StatelessWidget {

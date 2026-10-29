@@ -208,10 +208,13 @@ class RowsCard extends StatelessWidget {
 
 /// The 20-cell pixel bar used for state of charge.
 class PixelBar extends StatelessWidget {
-  const PixelBar({super.key, required this.pct, this.cells = 20, this.width = 120, this.limit});
+  const PixelBar({super.key, required this.pct, this.cells = 20, this.width = 120, this.limit, this.pulse = false});
   final int pct, cells;
   final double width;
   final int? limit;
+
+  /// While charging, the next empty cell slowly pulses red.
+  final bool pulse;
 
   @override
   Widget build(BuildContext context) {
@@ -225,21 +228,57 @@ class PixelBar extends StatelessWidget {
             Expanded(
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Container(
-                  margin: const EdgeInsets.all(1),
-                  decoration: BoxDecoration(
-                    color: i < lit ? Palette.red : Palette.unlit,
-                    borderRadius: BorderRadius.circular(1),
-                    border: lim != null && i == lim - 1 && i >= lit ? Border.all(color: Palette.red) : null,
-                    boxShadow: i < lit ? const [BoxShadow(color: Color(0x80E8333C), blurRadius: 5)] : null,
-                  ),
-                ),
+                child: pulse && i == lit && i < cells
+                    ? const _PulseCell()
+                    : Container(
+                        margin: const EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: i < lit ? Palette.red : Palette.unlit,
+                          borderRadius: BorderRadius.circular(1),
+                          border: lim != null && i == lim - 1 && i >= lit ? Border.all(color: Palette.red) : null,
+                          boxShadow: i < lit ? const [BoxShadow(color: Color(0x80E8333C), blurRadius: 5)] : null,
+                        ),
+                      ),
               ),
             ),
         ],
       ),
     );
   }
+}
+
+class _PulseCell extends StatefulWidget {
+  const _PulseCell();
+
+  @override
+  State<_PulseCell> createState() => _PulseCellState();
+}
+
+class _PulseCellState extends State<_PulseCell> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
+    ..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _c,
+    builder: (context, _) {
+      final t = Curves.easeInOutCubic.transform(_c.value);
+      return Container(
+        margin: const EdgeInsets.all(1),
+        decoration: BoxDecoration(
+          color: Color.lerp(Palette.unlit, Palette.red, t),
+          borderRadius: BorderRadius.circular(1),
+          boxShadow: [BoxShadow(color: Palette.red.withValues(alpha: .5 * t), blurRadius: 5)],
+        ),
+      );
+    },
+  );
 }
 
 String ago(DateTime? t) {

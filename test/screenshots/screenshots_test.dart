@@ -5,7 +5,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ioniq6_companion/car/car_state.dart';
 import 'package:ioniq6_companion/car/car_store.dart';
+import 'package:ioniq6_companion/car/demo_data.dart';
+import 'package:ioniq6_companion/ha/entities.dart';
 import 'package:ioniq6_companion/car/settings.dart';
 import 'package:ioniq6_companion/main.dart';
 import 'package:ioniq6_companion/widgets/rive_view.dart';
@@ -53,4 +56,31 @@ void main() {
       await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/$name.png'));
     });
   }
+
+  // Animations repeat while charging, so pump a fixed time instead of settling.
+  testWidgets('screenshot /charging while charging', (tester) async {
+    RiveView.enabled = false;
+    tester.view.physicalSize = const Size(1236, 2745);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final store = CarStore(Settings(MemorySettingsBackend()));
+    await store.start();
+    final states = demoStates();
+    for (final (id, v) in [(E.plugged, 'on'), (E.charging, 'on'), (E.chargePower, '7.2'), (E.chargeMinutes, '95')]) {
+      states[id] = states[id]!.copyWith(state: v);
+    }
+    store.car = CarState(states);
+    await tester.pumpWidget(CompanionApp(store: store));
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/charging');
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.runAsync(() async {
+      for (final img in tester.widgetList<Image>(find.byType(Image))) {
+        await precacheImage(img.image, tester.element(find.byType(Navigator)));
+      }
+    });
+    await tester.pump(const Duration(milliseconds: 700));
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/charging_live.png'));
+  });
 }

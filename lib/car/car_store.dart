@@ -253,6 +253,9 @@ class CarStore extends ChangeNotifier {
     unawaited(settings.save());
   }
 
+  /// Redraws screens after a display setting such as units changes.
+  void refreshViews() => notifyListeners();
+
   Future<void> refresh() async {
     if (isDemo) return;
     await connect();

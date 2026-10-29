@@ -48,7 +48,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
             Text(
               car.charging
                   ? '${duration(car.chargeMinutesLeft ?? 0)} to charge limit'
-                  : '${car.rangeKm ?? '–'} km · ${car.plugged ? 'plugged in' : 'unplugged'}',
+                  : '${store.settings.units.dist(car.rangeKm) ?? '–'} ${store.settings.units.distance} · ${car.plugged ? 'plugged in' : 'unplugged'}',
               style: Txt.muted(12),
             ),
           ],

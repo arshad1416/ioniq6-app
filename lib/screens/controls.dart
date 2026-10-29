@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
 import '../widgets/rive_view.dart';
+import 'valet.dart';
 
 /// Rive `Lock.state`: 0 locked, 1 unlocking, 2 unlocked, 3 error, 4 locking.
 int riveLockState(DoorLock s) => switch (s) {
@@ -142,6 +143,7 @@ class ControlsScreen extends StatelessWidget {
             StatusChip(car.hoodOpen ? 'Hood open' : 'Hood closed', ok: !car.hoodOpen),
           ],
         ),
+        const _ValetSwitch(),
         Text(
           'Hold the lock to ${locked ? 'unlock' : 'lock'} · hold the bolt to open the charge port',
           textAlign: TextAlign.center,
@@ -209,6 +211,51 @@ class _Dock extends StatelessWidget {
               onTap: onTap ?? () => Navigator.pushNamed(context, route!),
               child: item(0),
             ),
+    );
+  }
+}
+
+/// Valet mode limits what a valet can see and do in the car. Bluelink has it
+/// (valet/activate, valet/deactivate), but Home Assistant doesn't yet, so the
+/// switch stays off. When it's wired up it will need a hold and your PIN.
+class _ValetSwitch extends StatelessWidget {
+  const _ValetSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final v = AppScope.of(context).settings.valet;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: Palette.raise.withValues(alpha: .85),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Palette.line),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.room_service_outlined, size: 20, color: Palette.mute),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Valet mode', style: Txt.body(14)),
+                Text(
+                  'Limit ${v.speedLimitKmh} km/h · ${v.pinSet ? 'PIN set' : 'No PIN'}',
+                  style: Txt.muted(11),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Valet settings',
+            onPressed: () => Navigator.pushNamed(context, '/valet'),
+            icon: const Icon(Icons.settings_outlined, color: Palette.light, size: 20),
+          ),
+          GestureDetector(onTap: () => valetComingSoon(context), child: const Switch(value: false, onChanged: null)),
+        ],
+      ),
     );
   }
 }

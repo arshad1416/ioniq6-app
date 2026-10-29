@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../car/car_store.dart';
 import '../car/commands.dart';
+import '../security/biometrics.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -74,6 +75,12 @@ class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateM
 Future<void> runCommand(BuildContext context, CarCommand cmd) async {
   final store = AppScope.of(context);
   final messenger = ScaffoldMessenger.of(context);
+  if (store.settings.biometricCommands &&
+      !store.isDemo &&
+      !await Biometrics.confirm('Confirm to ${cmd.label.toLowerCase()}')) {
+    messenger.showSnackBar(SnackBar(content: Text('${cmd.label}: not confirmed, nothing sent')));
+    return;
+  }
   try {
     await store.send(cmd);
     messenger.showSnackBar(

@@ -51,7 +51,7 @@ class ClimateScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  cabin == null ? 'Cabin temperature not reported' : 'Inside ${cabin.round()} °C',
+                  cabin == null ? 'Cabin temperature not reported' : 'Inside ${store.settings.units.temp(cabin)}',
                   style: Txt.muted(11),
                 ),
                 const SizedBox(height: 12),
@@ -94,7 +94,7 @@ class ClimateScreen extends StatelessWidget {
                               icon: const Icon(Icons.chevron_left, color: Palette.mute),
                             ),
                             Text(
-                              '${req.tempC.toStringAsFixed(req.tempC % 1 == 0 ? 0 : 1)}°',
+                              store.settings.units.temp(req.tempC),
                               style: Txt.display(
                                 52,
                                 weight: 200,

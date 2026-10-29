@@ -43,6 +43,19 @@ void main() {
     expect(shown(), Turntable.frame(Turntable.rest));
   });
 
+  testWidgets('miles and Fahrenheit change what Home shows', (tester) async {
+    final store = await pumpApp(tester);
+    expect(find.text('328'), findsOneWidget);
+    store.settings
+      ..miles = true
+      ..fahrenheit = true;
+    store.refreshViews();
+    await tester.pumpAndSettle();
+    expect(find.text('204'), findsOneWidget);
+    expect(find.text(' mi'), findsOneWidget);
+    expect(find.textContaining('70°'), findsOneWidget);
+  });
+
   testWidgets('every screen opens from home', (tester) async {
     await pumpApp(tester);
     for (final (row, title) in [('Stats', 'Stats'), ('Health', 'Health'), ('Activity', 'Activity')]) {
@@ -54,7 +67,7 @@ void main() {
     }
   });
 
-  for (final route in ['/controls', '/climate', '/charging', '/settings', '/camera']) {
+  for (final route in ['/controls', '/climate', '/charging', '/settings', '/camera', '/emergency', '/valet']) {
     testWidgets('$route lays out without errors', (tester) async {
       await pumpApp(tester);
       tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);

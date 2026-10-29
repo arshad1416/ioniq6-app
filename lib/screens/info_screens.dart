@@ -23,6 +23,7 @@ class _StatsScreenState extends State<StatsScreen> {
   @override
   Widget build(BuildContext context) {
     final car = AppScope.of(context).car;
+    final units = AppScope.of(context).settings.units;
     final days = car.dailyStats;
     final km = days.fold<num>(0, (a, d) => a + d.distanceKm);
     final wh = days.fold<num>(0, (a, d) => a + d.consumedWh);
@@ -40,8 +41,8 @@ class _StatsScreenState extends State<StatsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  RollingNumber(thousands(car.odometerKm), style: Txt.display(52, weight: 200)),
-                  Text(' km', style: Txt.display(22, color: Palette.mute)),
+                  RollingNumber(thousands(units.dist(car.odometerKm)), style: Txt.display(52, weight: 200)),
+                  Text(' ${units.distance}', style: Txt.display(22, color: Palette.mute)),
                 ],
               ),
             ),
@@ -49,7 +50,7 @@ class _StatsScreenState extends State<StatsScreen> {
         ),
         Panel(
           children: [
-            const Lbl('Distance per month, km'),
+            Lbl('Distance per month, ${units.distance}'),
             FutureBuilder(
               future: _months,
               builder: (context, snap) {
@@ -76,9 +77,13 @@ class _StatsScreenState extends State<StatsScreen> {
               for (final d in days)
                 Kv(
                   '${_weekday(d.day)} ${d.day.day}',
-                  '${d.distanceKm} km · ${(d.consumedWh / 1000).toStringAsFixed(1)} kWh',
+                  '${units.dist(d.distanceKm)} ${units.distance} · ${(d.consumedWh / 1000).toStringAsFixed(1)} kWh',
                 ),
-              if (km > 0) Kv('Efficiency', '${(wh / 10 / km).toStringAsFixed(1)} kWh/100 km'),
+              if (km > 0)
+                Kv(
+                  'Efficiency',
+                  '${(wh / 10 / km * (units.miles ? 1.609344 : 1)).toStringAsFixed(1)} kWh/100 ${units.distance}',
+                ),
               if (days.any((d) => d.regenWh > 0))
                 Kv(
                   'Recovered by regen',
@@ -170,6 +175,7 @@ class HealthScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final car = AppScope.of(context).car;
+    final units = AppScope.of(context).settings.units;
     return SubScreen(
       title: 'Health',
       children: [
@@ -190,7 +196,8 @@ class HealthScreen extends StatelessWidget {
             Kv('High-voltage battery', car.soc == null ? '–' : '${car.soc}%'),
             Kv('Doors, hood, trunk', car.allClosed ? 'Closed' : 'Open'),
             // Bluelink's service schedule can lag the odometer, so show it as reported.
-            if (car.nextServiceKm != null) Kv('Next service (Bluelink)', 'at ${thousands(car.nextServiceKm)} km'),
+            if (car.nextServiceKm != null)
+              Kv('Next service (Bluelink)', 'at ${thousands(units.dist(car.nextServiceKm))} ${units.distance}'),
           ],
         ),
         const Lbl('Tires'),

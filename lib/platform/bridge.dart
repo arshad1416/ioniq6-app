@@ -34,10 +34,11 @@ class PlatformBridge {
 
   Future<void> _syncWidget(CarState car, DoorLock lock) async {
     final lockText = lock == DoorLock.locked ? 'Locked' : (lock == DoorLock.unlocked ? 'Unlocked' : '…');
-    final key = '${car.rangeKm}|${car.soc}|$lockText|${car.charging}';
+    final units = store.settings.units;
+    final key = '${car.rangeKm}|${car.soc}|$lockText|${car.charging}|${units.miles}';
     if (key == _lastWidget) return;
     _lastWidget = key;
-    await HomeWidget.saveWidgetData('range', '${car.rangeKm ?? '–'} km');
+    await HomeWidget.saveWidgetData('range', '${units.dist(car.rangeKm) ?? '–'} ${units.distance}');
     await HomeWidget.saveWidgetData('soc', car.soc ?? 0);
     await HomeWidget.saveWidgetData('status', '${car.soc ?? '–'}% · $lockText${car.charging ? ' · Charging' : ''}');
     await HomeWidget.updateWidget(qualifiedAndroidName: 'ca.arshad.ioniq6_companion.CarWidgetProvider');

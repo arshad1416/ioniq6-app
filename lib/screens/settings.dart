@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../car/car_store.dart';
+import '../car/settings.dart';
+import '../security/biometrics.dart';
 import '../theme.dart';
 import '../update/update_prompt.dart';
 import '../widgets/common.dart';
@@ -72,6 +75,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {});
   }
 
+  Future<void> _save(void Function(Settings s) change) async {
+    change(_store.settings);
+    await _store.settings.save();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setBiometric(bool on, void Function(Settings s, bool v) set) async {
+    if (on) {
+      final messenger = ScaffoldMessenger.of(context);
+      if (!await Biometrics.available()) {
+        messenger.showSnackBar(const SnackBar(content: Text('Set up a fingerprint or face unlock on the phone first')));
+        return;
+      }
+      if (!await Biometrics.confirm('Confirm it\'s you to turn this on')) return;
+    }
+    await _save((s) => set(s, on));
+  }
+
+  void _soon(String what) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(content: Text('$what needs Bluelink features Home Assistant doesn\'t have yet. It\'s coming.')),
+    );
+
+  Widget _soonRow(IconData icon, String label, {String? sub}) =>
+      NavRow(icon: icon, label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
+
+  Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
+    title: Text(title, style: Txt.body(14)),
+    subtitle: Text(sub, style: Txt.muted(12)),
+    value: value,
+    onChanged: onChanged,
+  );
+
+  Widget _choice<T>(IconData icon, String label, T value, List<(T, String)> options, ValueChanged<T> onChanged) =>
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Palette.mute),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: Txt.body(14))),
+            SegmentedButton<T>(
+              showSelectedIcon: false,
+              segments: [for (final (v, l) in options) ButtonSegment(value: v, label: Text(l))],
+              selected: {value},
+              onSelectionChanged: (v) => onChanged(v.first),
+              style: SegmentedButton.styleFrom(
+                selectedBackgroundColor: Palette.redDeep,
+                selectedForegroundColor: Palette.ink,
+                foregroundColor: Palette.mute,
+                side: const BorderSide(color: Palette.line),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final store = AppScope.of(context);
@@ -80,6 +142,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return SubScreen(
       title: 'Settings',
       children: [
+        const Lbl('Car'),
+        RowsCard(
+          children: [
+            _soonRow(Icons.people_outline, 'Driver profiles', sub: 'Seat, mirror and climate per driver'),
+            _soonRow(Icons.key_outlined, 'Digital Key', sub: 'Unlock and start with your phone'),
+            NavRow(
+              icon: Icons.directions_walk,
+              label: 'Walk-away lock',
+              sub: 'Runs in Home Assistant, 45 s after you leave',
+              value: car.walkAwayDryRun ? 'Test only' : 'On',
+            ),
+            NavRow(
+              icon: Icons.bluetooth,
+              label: 'Phone and car',
+              sub: 'OnePlus 13 Bluetooth to IONIQ 6',
+              value: car.phoneConnected ? 'Connected' : 'Not connected',
+            ),
+            _soonRow(Icons.schedule, 'Off-peak charging', sub: 'Charge when power is cheapest'),
+            const NavRow(icon: Icons.palette_outlined, label: 'Car colour', value: 'Ultimate Red'),
+            _switch(
+              'Car commands',
+              s.commandsEnabled ? 'On: holding a control acts on the car' : 'Off: the app is read-only',
+              s.commandsEnabled,
+              _setCommands,
+            ),
+          ],
+        ),
+        const Lbl('App'),
+        RowsCard(
+          children: [
+            _choice(Icons.speed, 'Distance & speed', s.miles, const [(false, 'km'), (true, 'mi')], (v) {
+              _save((s) => s.miles = v);
+              store.refreshViews();
+            }),
+            _choice(Icons.thermostat, 'Temperature', s.fahrenheit, const [(false, '°C'), (true, '°F')], (v) {
+              _save((s) => s.fahrenheit = v);
+              store.refreshViews();
+            }),
+            NavRow(
+              icon: Icons.language,
+              label: 'Language',
+              sub: 'Français is coming',
+              value: 'English',
+              onTap: () => _soon('Français'),
+            ),
+            _soonRow(Icons.event_outlined, 'Calendar sync', sub: 'Warm or cool the car before trips'),
+            _switch(
+              'Live Updates',
+              'Charging and climate on the lock screen',
+              s.liveUpdates,
+              (v) => _save((s) => s.liveUpdates = v),
+            ),
+            FutureBuilder(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, info) => NavRow(
+                icon: Icons.system_update,
+                label: 'Check for updates',
+                sub: 'New versions come from GitHub Releases',
+                value: info.hasData ? info.data!.version : null,
+                onTap: () => checkForUpdate(context, manual: true),
+              ),
+            ),
+          ],
+        ),
         const Lbl('Home Assistant'),
         TextField(
           controller: _url,
@@ -117,72 +243,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         RowsCard(
           children: [
-            SwitchListTile(
-              title: Text('Demo mode', style: Txt.body(14)),
-              subtitle: Text('Sample data. Nothing is sent anywhere.', style: Txt.muted(12)),
-              value: s.demo,
-              onChanged: (v) async {
-                s.demo = v;
-                await store.applySettings();
-              },
-            ),
-            SwitchListTile(
-              title: Text('Car commands', style: Txt.body(14)),
-              subtitle: Text(
-                s.commandsEnabled ? 'On: holding a control acts on the car' : 'Off: the app is read-only',
-                style: Txt.muted(12),
-              ),
-              value: s.commandsEnabled,
-              onChanged: _setCommands,
-            ),
-            SwitchListTile(
-              title: Text('Live Updates', style: Txt.body(14)),
-              subtitle: Text('Charging and climate on the lock screen', style: Txt.muted(12)),
-              value: s.liveUpdates,
-              onChanged: (v) async {
-                s.liveUpdates = v;
-                await s.save();
-                setState(() {});
-              },
-            ),
+            _switch('Demo mode', 'Sample data. Nothing is sent anywhere.', s.demo, (v) async {
+              s.demo = v;
+              await store.applySettings();
+            }),
           ],
         ),
-        const Lbl('Runs in Home Assistant'),
+        const Lbl('Security & privacy'),
+        RowsCard(
+          children: [
+            _switch(
+              'Keep me logged in',
+              s.keepLoggedIn ? 'Your Home Assistant token stays on this phone' : 'Forget the token when the app closes',
+              s.keepLoggedIn,
+              (v) => _save((s) => s.keepLoggedIn = v),
+            ),
+            _switch(
+              'Use biometrics at log in',
+              'Fingerprint or face when the app opens',
+              s.biometricLogin,
+              (v) => _setBiometric(v, (s, v) => s.biometricLogin = v),
+            ),
+            _switch(
+              'Use biometrics for PIN verification',
+              'Fingerprint or face before a car command is sent',
+              s.biometricCommands,
+              (v) => _setBiometric(v, (s, v) => s.biometricCommands = v),
+            ),
+            _soonRow(Icons.pin_outlined, 'Change PIN', sub: 'Your Bluelink PIN'),
+            _soonRow(Icons.password, 'Change password', sub: 'Your Bluelink account'),
+            _soonRow(Icons.devices_other, 'Registered devices', sub: 'Phones signed in to Bluelink'),
+          ],
+        ),
+        const Lbl('Help'),
         RowsCard(
           children: [
             NavRow(
-              icon: Icons.directions_walk,
-              label: 'Walk-away lock',
-              sub: '45 s after your phone leaves the car',
-              value: car.walkAwayDryRun ? 'Test only' : 'On',
-            ),
-            NavRow(
-              icon: Icons.bluetooth,
-              label: 'Phone and car',
-              sub: 'OnePlus 13 Bluetooth to IONIQ 6',
-              value: car.phoneConnected ? 'Connected' : 'Not connected',
-            ),
-          ],
-        ),
-        const Lbl('App'),
-        RowsCard(
-          children: [
-            FutureBuilder(
-              future: PackageInfo.fromPlatform(),
-              builder: (context, info) => NavRow(
-                icon: Icons.system_update,
-                label: 'Check for updates',
-                sub: 'New versions come from GitHub Releases',
-                value: info.hasData ? info.data!.version : null,
-                onTap: () => checkForUpdate(context, manual: true),
+              icon: Icons.help_outline,
+              label: 'Help & support',
+              sub: 'Hyundai Canada owners',
+              onTap: () => launchUrl(
+                Uri.parse('https://www.hyundaicanada.com/en/owners-section'),
+                mode: LaunchMode.externalApplication,
               ),
             ),
+            NavRow(
+              icon: Icons.emergency_outlined,
+              label: 'Emergency services',
+              sub: '911, roadside assistance, share location',
+              onTap: () => Navigator.pushNamed(context, '/emergency'),
+            ),
           ],
-        ),
-        Text(
-          'Change the walk-away lock in Home Assistant. Car colour: Ultimate Red.',
-          style: Txt.muted(11),
-          textAlign: TextAlign.center,
         ),
       ],
     );

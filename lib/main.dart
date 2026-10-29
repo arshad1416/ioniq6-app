@@ -4,19 +4,22 @@ import 'package:flutter/services.dart';
 import 'car/car_store.dart';
 import 'car/settings.dart';
 import 'platform/bridge.dart';
+import 'security/lock_gate.dart';
 import 'screens/camera.dart';
 import 'screens/charging.dart';
 import 'screens/climate.dart';
 import 'screens/controls.dart';
+import 'screens/emergency.dart';
 import 'screens/home.dart';
 import 'screens/info_screens.dart';
 import 'screens/settings.dart';
+import 'screens/valet.dart';
 import 'motion.dart';
 import 'theme.dart';
 import 'update/update_prompt.dart';
 import 'widgets/common.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -25,7 +28,9 @@ void main() {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  final store = CarStore(Settings(DeviceSettingsBackend()))..start();
+  final settings = Settings(DeviceSettingsBackend());
+  await settings.load(); // so the lock gate knows whether to show
+  final store = CarStore(settings)..start();
   PlatformBridge(store).attach();
   runApp(CompanionApp(store: store));
   // Look for a new release on GitHub once the app has settled.
@@ -46,6 +51,7 @@ class CompanionApp extends StatelessWidget {
     child: MaterialApp(
       title: 'IONIQ 6',
       navigatorKey: navigator,
+      builder: (context, child) => LockGate(locked: store.settings.biometricLogin, child: child!),
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       onGenerateRoute: (settings) {
@@ -65,5 +71,7 @@ class CompanionApp extends StatelessWidget {
     '/activity': (_) => const ActivityScreen(),
     '/settings': (_) => const SettingsScreen(),
     '/camera': (_) => const CameraScreen(),
+    '/emergency': (_) => const EmergencyScreen(),
+    '/valet': (_) => const ValetScreen(),
   };
 }

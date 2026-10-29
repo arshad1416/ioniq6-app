@@ -17,6 +17,7 @@ class HomeScreen extends StatelessWidget {
     final store = AppScope.of(context);
     final car = store.car;
     final soc = car.soc ?? 0;
+    final units = store.settings.units;
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
@@ -73,8 +74,8 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  RollingNumber('${car.rangeKm ?? '–'}', style: Txt.display(34)),
-                  Text(' km', style: Txt.display(15)),
+                  RollingNumber('${units.dist(car.rangeKm) ?? '–'}', style: Txt.display(34)),
+                  Text(' ${units.distance}', style: Txt.display(15)),
                   const SizedBox(width: 12),
                   Flexible(child: PixelBar(pct: soc)),
                   const SizedBox(width: 12),
@@ -99,8 +100,8 @@ class HomeScreen extends StatelessWidget {
                       icon: Icons.thermostat_outlined,
                       label: 'Climate',
                       value: car.climateOn
-                          ? 'On · ${_t(car.setTempC)}'
-                          : 'Off · set ${_t(store.settings.climate.tempC)}',
+                          ? 'On · ${units.temp(car.setTempC)}'
+                          : 'Off · set ${units.temp(store.settings.climate.tempC)}',
                       onTap: () => Navigator.pushNamed(context, '/climate'),
                     ),
                     NavRow(
@@ -114,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                     NavRow(
                       icon: Icons.bar_chart,
                       label: 'Stats',
-                      value: '${thousands(car.odometerKm)} km',
+                      value: '${thousands(units.dist(car.odometerKm))} ${units.distance}',
                       onTap: () => Navigator.pushNamed(context, '/stats'),
                     ),
                     NavRow(
@@ -168,8 +169,6 @@ String _lockWord(DoorLock s) => switch (s) {
   DoorLock.error => 'Lock error',
   DoorLock.unknown => 'Lock unknown',
 };
-
-String _t(double? c) => c == null ? '–' : '${c.toStringAsFixed(c % 1 == 0 ? 0 : 1)}°';
 
 class _Banner extends StatelessWidget {
   const _Banner(this.text, {this.detail});

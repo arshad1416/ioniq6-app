@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'commands.dart';
+import 'units.dart';
 
 /// Where settings live. Swapped for an in-memory version in tests.
 abstract class SettingsBackend {
@@ -36,6 +37,12 @@ class MemorySettingsBackend implements SettingsBackend {
   Future<void> write(String key, String? value) async => value == null ? values.remove(key) : values[key] = value;
 }
 
+class ValetPrefs {
+  const ValetPrefs({this.speedLimitKmh = 80, this.pinSet = true, this.hideNavigation = true, this.hidePhone = true});
+  final int speedLimitKmh;
+  final bool pinSet, hideNavigation, hidePhone;
+}
+
 class Settings {
   Settings(this._backend);
   final SettingsBackend _backend;
@@ -49,6 +56,24 @@ class Settings {
   bool liveUpdates = true;
   ClimateRequest climate = const ClimateRequest();
 
+  bool miles = false;
+  bool fahrenheit = false;
+  String language = 'en';
+
+  /// Off: the Home Assistant token is kept only until the app closes.
+  bool keepLoggedIn = true;
+
+  /// Ask for a fingerprint or face when the app opens.
+  bool biometricLogin = false;
+
+  /// Ask for a fingerprint or face before a held control acts on the car.
+  bool biometricCommands = false;
+
+  /// Valet preferences as shown in the app. Nothing here reaches the car yet.
+  ValetPrefs valet = const ValetPrefs();
+
+  Units get units => Units(miles: miles, fahrenheit: fahrenheit);
+
   bool get isConfigured => haUrl.isNotEmpty && token.isNotEmpty;
 
   Future<void> load() async {
@@ -58,14 +83,26 @@ class Settings {
     commandsEnabled = await _backend.read('commandsEnabled') == 'true';
     liveUpdates = (await _backend.read('liveUpdates') ?? 'true') == 'true';
     climate = ClimateRequest(tempC: double.tryParse(await _backend.read('climateTemp') ?? '') ?? 21);
+    miles = await _backend.read('miles') == 'true';
+    fahrenheit = await _backend.read('fahrenheit') == 'true';
+    language = await _backend.read('language') ?? 'en';
+    keepLoggedIn = (await _backend.read('keepLoggedIn') ?? 'true') == 'true';
+    biometricLogin = await _backend.read('biometricLogin') == 'true';
+    biometricCommands = await _backend.read('biometricCommands') == 'true';
   }
 
   Future<void> save() async {
     await _backend.write('haUrl', haUrl);
-    await _backend.write('token', token.isEmpty ? null : token);
+    await _backend.write('token', token.isEmpty || !keepLoggedIn ? null : token);
     await _backend.write('demo', '$demo');
     await _backend.write('commandsEnabled', '$commandsEnabled');
     await _backend.write('liveUpdates', '$liveUpdates');
     await _backend.write('climateTemp', '${climate.tempC}');
+    await _backend.write('miles', '$miles');
+    await _backend.write('fahrenheit', '$fahrenheit');
+    await _backend.write('language', language);
+    await _backend.write('keepLoggedIn', '$keepLoggedIn');
+    await _backend.write('biometricLogin', '$biometricLogin');
+    await _backend.write('biometricCommands', '$biometricCommands');
   }
 }

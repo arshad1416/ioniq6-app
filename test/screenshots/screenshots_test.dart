@@ -45,6 +45,8 @@ void main() {
     '/activity',
     '/settings',
     '/camera',
+    '/emergency',
+    '/valet',
   ]) {
     testWidgets('screenshot $route', (tester) async {
       RiveView.enabled = false;

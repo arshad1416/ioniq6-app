@@ -68,13 +68,15 @@ class HaClient {
     ];
   }
 
+  /// Over the WebSocket, because REST turns a service's own error into a bare
+  /// "500 Internal Server Error"; this way the add-on's reason reaches the user.
   Future<void> callService(String domain, String service, Map<String, dynamic> data) async {
-    final r = await _http
-        .post(_api('services/$domain/$service'), headers: _headers, body: jsonEncode(data))
-        .timeout(const Duration(seconds: 30));
-    if (r.statusCode != 200) {
-      throw HaException('$domain.$service failed (${r.statusCode}): ${r.body}');
-    }
+    await _send({
+      'type': 'call_service',
+      'domain': domain,
+      'service': service,
+      'service_data': data,
+    }, timeout: const Duration(seconds: 120));
   }
 
   /// State changes for [ids] since [start], oldest first.
@@ -216,13 +218,13 @@ class HaClient {
     await authed.future.timeout(const Duration(seconds: 15));
   }
 
-  Future<Map<String, dynamic>> _send(Map<String, dynamic> msg) async {
+  Future<Map<String, dynamic>> _send(Map<String, dynamic> msg, {Duration timeout = const Duration(seconds: 20)}) async {
     await _connect();
     final id = _nextId++;
     final c = Completer<Map<String, dynamic>>();
     _pending[id] = c;
     _ws!.sink.add(jsonEncode({...msg, 'id': id}));
-    return c.future.timeout(const Duration(seconds: 20));
+    return c.future.timeout(timeout);
   }
 
   Future<void> close() async {

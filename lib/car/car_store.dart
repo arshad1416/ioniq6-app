@@ -220,6 +220,8 @@ class CarStore extends ChangeNotifier {
       StartChargeCommand() => car.charging,
       StopChargeCommand() => !car.charging,
       SetChargeLimitsCommand(:final ac) => car.acLimit == ac,
+      ValetCommand(:final on) => car.valetOn == on,
+      PreconditionCommand(:final on) => car.preconditioningOn == on,
       null => false,
       _ => true,
     };
@@ -263,7 +265,11 @@ class CarStore extends ChangeNotifier {
       case SetChargeLimitsCommand(:final ac, :final dc):
         set(E.acLimit, '$ac');
         set(E.dcLimit, '$dc');
-      case OpenChargePortCommand() || FlashCommand() || HonkCommand():
+      case ValetCommand(:final on):
+        set(E.valet, on ? 'on' : 'off');
+      case PreconditionCommand(:final on):
+        set(E.preconditioning, on ? 'on' : 'off');
+      case OpenChargePortCommand() || FlashCommand() || HonkCommand() || TakeCameraShotsCommand():
         break;
     }
     _clearPending();
@@ -295,6 +301,10 @@ class CarStore extends ChangeNotifier {
   }
 
   /// Tests a URL and token without changing the live connection.
+  /// A full URL on the Home Assistant server, for paths like an image
+  /// entity's entity_picture (which carries its own access token).
+  Uri? haUri(String path) => settings.haUrl.isEmpty ? null : Uri.parse(settings.haUrl).resolve(path);
+
   Future<void> testConnection(String url, String token) => _clientFactory(Uri.parse(url), token).ping();
 
   @override

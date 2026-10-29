@@ -145,6 +145,15 @@ class _ChargingScreenState extends State<ChargingScreen> {
                 ),
               ],
             ),
+            if (car.preconditioningOn != null) ...[
+              const Divider(color: Palette.line, height: 1),
+              HoldButton(
+                enabled: store.pending == null,
+                onHeld: () => runCommand(context, PreconditionCommand(on: !car.preconditioningOn!)),
+                builder: (context, p) =>
+                    _SplitButton(p, car.preconditioningOn! ? 'Stop warming battery' : 'Warm battery for fast charging'),
+              ),
+            ],
           ],
         ),
         Panel(

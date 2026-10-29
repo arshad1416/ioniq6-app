@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
@@ -48,8 +49,12 @@ class Extras(DataUpdateCoordinator[Snapshot]):
         self.location: Location | None = None
         self.address: str | None = None
         self.located_at: datetime | None = None
+        # What we last asked for, until kia_uvo's next status says otherwise.
+        self.preconditioning_override: bool | None = None
 
     async def _async_update_data(self) -> Snapshot:
+        # kia_uvo has polled since the last command, so trust its status again.
+        self.preconditioning_override = None
         snap = Snapshot(svm=self.data.svm if self.data else None, svm_fetched=self.data.svm_fetched if self.data else None)
         try:
             snap.valet = await self.hass.async_add_executor_job(self.bluelink.valet_status)
@@ -112,6 +117,20 @@ class Extras(DataUpdateCoordinator[Snapshot]):
             await self.hass.async_add_executor_job(self.bluelink.request_svm)
         except BluelinkError as err:
             raise HomeAssistantError(str(err)) from err
+        # Nothing tells us when the car has uploaded them; look again shortly.
+        for delay in (60, 150, 300):
+            async_call_later(self.hass, delay, self._refresh_later)
+
+    async def _refresh_later(self, _now) -> None:
+        await self.async_request_refresh()
+
+    async def async_set_preconditioning(self, on: bool) -> None:
+        try:
+            await self.hass.async_add_executor_job(self.bluelink.set_preconditioning, on)
+        except BluelinkError as err:
+            raise HomeAssistantError(f"Battery preconditioning: {err}") from err
+        self.preconditioning_override = on
+        async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
 
 def _vehicle_manager(hass: HomeAssistant) -> Any | None:

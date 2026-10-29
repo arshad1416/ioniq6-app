@@ -1,19 +1,61 @@
 import 'package:flutter/material.dart';
 
+import '../car/commands.dart';
 import '../car/settings.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/hold_button.dart';
 import '../widgets/line_icon.dart';
 
-void valetComingSoon(BuildContext context) => ScaffoldMessenger.of(context)
+void _setInCar(BuildContext context) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()
   ..showSnackBar(
-    const SnackBar(content: Text('Valet mode needs Bluelink features Home Assistant doesn\'t have yet. It\'s coming.')),
+    const SnackBar(content: Text('Bluelink Canada can only turn valet mode on and off. Change this in the car.')),
   );
 
-/// Valet settings: speed limit, valet PIN and what's hidden from the valet.
-/// They're kept on the phone for now; the car only gets them once Home
-/// Assistant can reach Bluelink's valet settings.
+/// Turns valet mode on or off with a hold. Needs the Ioniq 6 Extras add-on in
+/// Home Assistant; until it's there the switch explains what's missing.
+class ValetToggle extends StatelessWidget {
+  const ValetToggle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = AppScope.of(context);
+    final on = store.car.valetOn;
+    if (on == null && !store.isDemo) {
+      return GestureDetector(
+        onTap: () => ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Install the Ioniq 6 Extras add-on in Home Assistant to use valet mode.')),
+          ),
+        child: const Switch(value: false, onChanged: null),
+      );
+    }
+    final value = on ?? false;
+    return HoldButton(
+      enabled: store.pending == null,
+      onHeld: () => runCommand(context, ValetCommand(on: !value)),
+      builder: (context, p) => Stack(
+        alignment: Alignment.center,
+        children: [
+          IgnorePointer(
+            child: Switch(value: value, onChanged: (_) {}),
+          ),
+          if (p > 0)
+            SizedBox.square(
+              dimension: 30,
+              child: CircularProgressIndicator(value: p, strokeWidth: 2, color: Palette.red),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Valet settings. Bluelink Canada can only switch valet mode on and off;
+/// the speed limit and the rest are set in the car, so they're shown here
+/// (as the car reports them where it does) and kept on the phone.
 class ValetScreen extends StatefulWidget {
   const ValetScreen({super.key});
 
@@ -30,7 +72,10 @@ class _ValetScreenState extends State<ValetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final v = AppScope.of(context).settings.valet;
+    final store = AppScope.of(context);
+    final v = store.settings.valet;
+    final carLimit = store.car.valetMaxSpeed;
+    final limit = carLimit ?? v.speedLimitKmh;
     return SubScreen(
       title: 'Valet mode',
       back: 'Controls',
@@ -39,18 +84,29 @@ class _ValetScreenState extends State<ValetScreen> {
           children: [
             Row(
               children: [
+                Expanded(child: Text('Valet mode', style: Txt.body(16, weight: 600))),
+                const ValetToggle(),
+              ],
+            ),
+            Text('Hold the switch to turn it on or off. It uses your Bluelink PIN.', style: Txt.muted(13)),
+          ],
+        ),
+        Panel(
+          children: [
+            Row(
+              children: [
                 Expanded(child: Text('Speed limit', style: Txt.body(16, weight: 600))),
-                Text('${v.speedLimitKmh} km/h', style: Txt.body(16, weight: 600)),
+                Text('$limit km/h', style: Txt.body(16, weight: 600)),
               ],
             ),
             SliderTheme(
               data: SliderTheme.of(context).copyWith(overlayShape: SliderComponentShape.noOverlay),
               child: Slider(
-                value: v.speedLimitKmh.toDouble(),
+                value: limit.clamp(40, 120).toDouble(),
                 min: 40,
                 max: 120,
                 divisions: 8,
-                onChanged: (x) => _update((v) => v.copyWith(speedLimitKmh: x.round())),
+                onChanged: carLimit != null ? null : (x) => _update((v) => v.copyWith(speedLimitKmh: x.round())),
               ),
             ),
             Row(
@@ -60,7 +116,12 @@ class _ValetScreenState extends State<ValetScreen> {
                 Text('120 km/h', style: Txt.muted(15)),
               ],
             ),
-            Text('The car warns the valet and logs it if they go over.', style: Txt.muted(13)),
+            Text(
+              carLimit != null
+                  ? 'As set in the car. The car warns the valet and logs it if they go over.'
+                  : 'The car warns the valet and logs it if they go over.',
+              style: Txt.muted(13),
+            ),
           ],
         ),
         Panel(
@@ -89,11 +150,7 @@ class _ValetScreenState extends State<ValetScreen> {
         ),
         RowsCard(
           children: [
-            NavRow(
-              glyph: const LineIcon(Glyphs.lock),
-              label: 'Change valet PIN',
-              onTap: () => valetComingSoon(context),
-            ),
+            NavRow(glyph: const LineIcon(Glyphs.lock), label: 'Change valet PIN', onTap: () => _setInCar(context)),
             SwitchRow(
               glyph: const LineIcon(Glyphs.lines),
               label: 'Hide navigation history',
@@ -111,8 +168,8 @@ class _ValetScreenState extends State<ValetScreen> {
           ],
         ),
         Text(
-          'Saved on this phone for now. Sending these to the car needs Bluelink\'s valet settings in Home Assistant, '
-          'and will then ask for a hold and your PIN.',
+          'Bluelink Canada can only turn valet mode on and off. Set the PIN and what\'s hidden in the car; '
+          'these choices are kept on this phone as a reminder.',
           style: Txt.muted(13),
           textAlign: TextAlign.center,
         ),

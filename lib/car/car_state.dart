@@ -121,6 +121,27 @@ class CarState {
     return address is String && address.isNotEmpty ? address : null;
   }
 
+  /// Valet mode as the car reports it; null until the add-on is installed.
+  bool? get valetOn => switch (_str(E.valet)) {
+    'on' => true,
+    'off' => false,
+    _ => null,
+  };
+
+  /// Battery warming for fast charging; null until the add-on is installed.
+  bool? get preconditioningOn => switch (_str(E.preconditioning)) {
+    'on' => true,
+    'off' => false,
+    _ => null,
+  };
+
+  int? get valetMaxSpeed => (_attrs(E.valet)['maxSpeed'] as num?)?.round();
+
+  /// The image entity's own URL (path plus access token) for a 360 view.
+  String? cameraPicture(String view) => _attrs(E.camera(view))['entity_picture'] as String?;
+  DateTime? get cameraTakenAt => DateTime.tryParse(_str(E.camera('front')) ?? '')?.toLocal();
+  bool get hasCamera => _s.containsKey(E.camera('front'));
+
   DateTime? get locatedAt => DateTime.tryParse('${_attrs(E.parked)['located_at']}')?.toLocal();
 
   List<DailyStat> get dailyStats {

@@ -18,6 +18,12 @@ abstract final class E {
   /// last parked, asked for when the phone leaves the car or on request, with
   /// the street address as an attribute.
   static const parked = 'device_tracker.ioniq_6_parked';
+  static const valet = 'switch.ioniq_6_valet_mode';
+  static const preconditioning = 'switch.ioniq_6_battery_preconditioning';
+
+  /// The latest stored 360 shots, one image entity per view.
+  static String camera(String view) => 'image.ioniq_6_360_$view';
+  static const cameraViews = ['front', 'rear', 'left', 'right', 'top'];
 
   static const charging = 'binary_sensor.ioniq_6_ev_battery_charge';
   static const plugged = 'binary_sensor.ioniq_6_ev_battery_plug';
@@ -97,6 +103,9 @@ abstract final class E {
     dailyStats,
     location,
     parked,
+    valet,
+    preconditioning,
+    for (final v in cameraViews) camera(v),
     charging,
     plugged,
     chargePower,

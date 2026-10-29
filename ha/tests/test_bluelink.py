@@ -109,3 +109,10 @@ def test_last_svm_splits_strip():
     assert front.getpixel((5, 5))[0] > 200 and top.getpixel((5, 5)) > (200, 200, 200)
     assert shots.taken.isoformat() == "2026-10-29T06:15:00+00:00"
     assert "svmImage" not in shots.raw
+
+
+def test_preconditioning_on_uses_pin():
+    b, api = make({"evc/prcndtngon": FakeResponse(OK, {"transactionId": "T2"})})
+    b.set_preconditioning(True)
+    path, headers, body = api.calls[0]
+    assert path == "evc/prcndtngon" and headers["pAuth"] == "PAUTH" and body == {"pin": "1234"}

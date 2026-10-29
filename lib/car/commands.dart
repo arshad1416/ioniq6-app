@@ -151,3 +151,47 @@ class HonkCommand extends CarCommand {
   @override
   String get service => 'start_hazard_lights_and_horn';
 }
+
+/// Valet mode through the ioniq6_extras add-on (Bluelink valet/activate and
+/// valet/deactivate with the PIN).
+class ValetCommand extends CarCommand {
+  const ValetCommand({required this.on});
+  final bool on;
+  @override
+  String get label => on ? 'Turn on valet mode' : 'Turn off valet mode';
+  @override
+  String get domain => 'switch';
+  @override
+  String get service => on ? 'turn_on' : 'turn_off';
+  @override
+  Map<String, dynamic> get data => {'entity_id': E.valet};
+}
+
+/// Asks the car for new 360 shots. Wakes the car and counts against
+/// Bluelink's daily and monthly limits.
+class TakeCameraShotsCommand extends CarCommand {
+  const TakeCameraShotsCommand();
+  @override
+  String get label => 'Take new 360 shots';
+  @override
+  String get domain => 'ioniq6_extras';
+  @override
+  String get service => 'take_360_shots';
+  @override
+  Map<String, dynamic> get data => {};
+}
+
+/// Warms the battery for fast charging, or stops (Bluelink evc/prcndtngon,
+/// evc/prcndtngoff through the ioniq6_extras add-on).
+class PreconditionCommand extends CarCommand {
+  const PreconditionCommand({required this.on});
+  final bool on;
+  @override
+  String get label => on ? 'Warm battery' : 'Stop warming battery';
+  @override
+  String get domain => 'switch';
+  @override
+  String get service => on ? 'turn_on' : 'turn_off';
+  @override
+  Map<String, dynamic> get data => {'entity_id': E.preconditioning};
+}

@@ -132,15 +132,16 @@ class ControlsScreen extends StatelessWidget {
   }
 }
 
-/// Valet mode limits what a valet can see and do in the car. Bluelink has it
-/// (valet/activate, valet/deactivate), but Home Assistant doesn't yet, so the
-/// switch stays off. When it's wired up it will need a hold and your PIN.
+/// Valet mode limits what a valet can see and do in the car. It's switched
+/// through the Ioniq 6 Extras add-on with a hold; the gear opens its settings.
 class _ValetSwitch extends StatelessWidget {
   const _ValetSwitch();
 
   @override
   Widget build(BuildContext context) {
-    final v = AppScope.of(context).settings.valet;
+    final store = AppScope.of(context);
+    final v = store.settings.valet;
+    final car = store.car;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       decoration: BoxDecoration(
@@ -157,7 +158,14 @@ class _ValetSwitch extends StatelessWidget {
               children: [
                 Text('Valet mode', style: Txt.body(16)),
                 Text(
-                  'Limit ${v.speedLimitKmh} km/h · ${v.pinSet ? 'PIN set' : 'No PIN'}',
+                  [
+                    'Limit ${car.valetMaxSpeed ?? v.speedLimitKmh} km/h',
+                    switch (car.valetOn) {
+                      true => 'On',
+                      false => 'Off',
+                      null => 'Not set up',
+                    },
+                  ].join(' · '),
                   style: Txt.muted(13),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -170,7 +178,7 @@ class _ValetSwitch extends StatelessWidget {
             style: IconButton.styleFrom(backgroundColor: Palette.unlit, fixedSize: const Size.square(34)),
             icon: const LineIcon(Glyphs.gear, color: Palette.light, size: 18),
           ),
-          GestureDetector(onTap: () => valetComingSoon(context), child: const Switch(value: false, onChanged: null)),
+          const ValetToggle(),
         ],
       ),
     );

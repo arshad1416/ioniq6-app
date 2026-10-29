@@ -150,6 +150,21 @@ class Bluelink:
             time.sleep(5)
         raise BluelinkError("The car didn't answer in time")
 
+    # Battery preconditioning --------------------------------------------------
+
+    def preconditioning(self) -> bool | None:
+        """Whether the battery is warming, from kia_uvo's last status (no call)."""
+        data = getattr(self._vehicle, "data", None) or {}
+        value = ((data.get("status") or {}).get("evStatus") or {}).get("batteryPreconditiong")
+        return None if value is None else bool(value)
+
+    def set_preconditioning(self, on: bool) -> None:
+        """A car command: warms (or stops warming) the battery for fast charging."""
+        _, headers = self._post("evc/prcndtngon" if on else "evc/prcndtngoff", pin=True, body={"pin": self._vm.token.pin})
+        transaction = headers.get("transactionId")
+        if transaction:
+            self._wait(transaction)
+
     # 360 camera ---------------------------------------------------------------
 
     def request_svm(self) -> None:

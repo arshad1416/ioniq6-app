@@ -12,7 +12,7 @@ Everything the phone app needs on the Home Assistant side lives here.
 ## Install or update (on the Pi)
 
 ```sh
-git clone https://github.com/arshad1416/ioniq6-app ~/ioniq6-app   # first time only
+git clone -b app-v1 https://github.com/arshad1416/ioniq6-app ~/ioniq6-app   # first time only
 git -C ~/ioniq6-app pull
 sudo ~/ioniq6-app/ha/install.sh
 ```

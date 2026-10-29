@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Ioniq 6 Extras",
+        "description": "Adds parked location, valet mode and the 360 camera for your Ioniq 6. It uses the Hyundai / Kia Connect integration's existing Bluelink login."
+      }
+    },
+    "abort": {
+      "already_configured": "Already set up.",
+      "no_kia_uvo": "Set up the Hyundai / Kia Connect integration first."
+    }
+  }
+}

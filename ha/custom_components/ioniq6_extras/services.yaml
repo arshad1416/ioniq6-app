@@ -1,0 +1,9 @@
+locate:
+  name: Locate car
+  description: Ask the car where it is (Bluelink Find My Car, read only) and update its parked location.
+refresh:
+  name: Refresh
+  description: Re-read the stored 360 shots and valet state from Bluelink.
+take_360_shots:
+  name: Take new 360 shots
+  description: Ask the car to take new 360 camera shots. Wakes the car and counts against Bluelink's daily and monthly limits.

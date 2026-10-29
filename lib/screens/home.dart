@@ -206,9 +206,8 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
-          Hero(
-            tag: 'car',
-            child: Image.asset('assets/images/car.webp', fit: BoxFit.contain, semanticLabel: 'Your Ioniq 6'),
+          const Positioned.fill(
+            child: Hero(tag: 'car', child: Turntable()),
           ),
         ],
       ),
@@ -299,6 +298,67 @@ class _Qa extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Arshad's car as a 36-frame 360° turntable. Drag sideways to turn it; it
+/// eases back to the front three-quarter view when let go.
+class Turntable extends StatefulWidget {
+  const Turntable({super.key});
+
+  static const frames = 36, rest = 4;
+  static const _pxPerFrame = 12.0;
+  static String frame(int i) => 'assets/images/turntable/turn_${i.toString().padLeft(2, '0')}.webp';
+
+  @override
+  State<Turntable> createState() => _TurntableState();
+}
+
+class _TurntableState extends State<Turntable> with SingleTickerProviderStateMixin {
+  late final AnimationController _settle = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
+    ..addListener(() => setState(() => _pos = _from + (_to - _from) * Curves.easeOutCubic.transform(_settle.value)));
+  double _pos = Turntable.rest.toDouble(), _from = 0, _to = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    for (var i = 0; i < Turntable.frames; i++) {
+      precacheImage(AssetImage(Turntable.frame(i)), context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _settle.dispose();
+    super.dispose();
+  }
+
+  void _release() {
+    // Turn back the short way round.
+    var delta = (Turntable.rest - _pos) % Turntable.frames;
+    if (delta > Turntable.frames / 2) delta -= Turntable.frames;
+    _from = _pos;
+    _to = _pos + delta;
+    _settle.forward(from: 0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final i = _pos.round() % Turntable.frames;
+    return GestureDetector(
+      onHorizontalDragStart: (_) => _settle.stop(),
+      onHorizontalDragUpdate: (d) => setState(() => _pos -= d.delta.dx / Turntable._pxPerFrame),
+      onHorizontalDragEnd: (_) => _release(),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox.expand(
+        child: Image.asset(
+          Turntable.frame(i),
+          fit: BoxFit.contain,
+          gaplessPlayback: true,
+          semanticLabel: 'Your Ioniq 6. Drag to turn it.',
         ),
       ),
     );

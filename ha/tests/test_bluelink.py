@@ -129,7 +129,7 @@ def test_request_svm_accepts_empty_reply():
     b.request_svm()
     path, headers, body = api.calls[0]
     assert (path, body) == ("vrfypin", {"pin": "1234"}) and headers["accessToken"] == "AT"
-    assert api.calls[1][0] == "rfc/fndmcrsvm" and "pAuth" not in api.calls[1][1]
+    assert api.calls[1][0] == "rfc/fndmcrsvm" and api.calls[1][1]["pAuth"] == "PAUTH"
 
 
 def test_http_error_without_json_is_readable():

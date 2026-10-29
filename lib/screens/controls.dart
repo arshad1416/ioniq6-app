@@ -24,7 +24,8 @@ const _photoSize = Size(768, 1376);
 // Centre of the sunroof glass, which runs from 43% to 55.5% of the photo height.
 const _lockSpot = Offset(.5, .493);
 const _portSpot = Offset(.735, .76);
-const _trunkSpot = Offset(.5, .69);
+// On the rear spoiler, where the high brake light runs across.
+const _trunkSpot = Offset(.5, .776);
 
 class ControlsScreen extends StatelessWidget {
   const ControlsScreen({super.key});
@@ -77,7 +78,14 @@ class ControlsScreen extends StatelessWidget {
                 _trunkSpot,
                 80,
                 Center(
-                  child: Text('Trunk', style: Txt.body(14, weight: 500, color: const Color(0xFFD9D9DB))),
+                  child: Text(
+                    'Trunk',
+                    style: Txt.body(
+                      14,
+                      weight: 500,
+                      color: const Color(0xFFF2F2F2),
+                    ).copyWith(shadows: const [Shadow(blurRadius: 6)]),
+                  ),
                 ),
               ),
               place(

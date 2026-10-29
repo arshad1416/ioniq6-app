@@ -24,6 +24,7 @@ Map<String, EntityState> demoStates() {
         day(4): {'total_consumed': 775, 'climate_consumption': 51, 'regenerated_energy': 1214, 'distance': 8},
       }),
       s(E.location, 'home'),
+      s(E.parked, 'home', {'latitude': 43.65, 'longitude': -79.38, 'address': 'Home'}),
       s(E.charging, 'off'),
       s(E.plugged, 'off'),
       s(E.chargePower, 'unknown'),

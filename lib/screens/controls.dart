@@ -113,17 +113,22 @@ class ControlsScreen extends StatelessWidget {
     );
   }
 
-  void _find(BuildContext context) {
-    final loc = AppScope.of(context).car.location;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          loc == null
-              ? 'The car isn\'t sharing its location with Home Assistant right now.'
-              : 'Car is at ${loc.$1.toStringAsFixed(5)}, ${loc.$2.toStringAsFixed(5)}',
-        ),
-      ),
-    );
+  Future<void> _find(BuildContext context) async {
+    final store = AppScope.of(context);
+    final messenger = ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Asking the car where it is…')));
+    try {
+      await store.locate();
+      final at = store.car.parkedAt;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(at == null ? 'The car didn\'t share its location.' : 'Parked at $at')));
+    } catch (e) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('Couldn\'t reach the car: $e')));
+    }
   }
 }
 

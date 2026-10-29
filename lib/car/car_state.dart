@@ -78,7 +78,7 @@ class CarState {
 
   /// Home Assistant's weather, which is for home, not necessarily where the car is.
   double? get homeWeatherC => (_attrs(E.weather)['temperature'] as num?)?.toDouble();
-  bool get atHome => _str(E.location) == 'home';
+  bool get atHome => parkedAt == 'home';
   bool get defrostOn => _on(E.defrost);
   bool get wheelHeatOn => _on(E.wheelHeat);
 
@@ -101,11 +101,27 @@ class CarState {
   bool get phoneConnected => _on(E.phoneConnected);
   bool get walkAwayDryRun => _str(E.walkAwayDryRun) != 'off';
 
+  /// Where the car is: the add-on's parked fix when it has one, else the
+  /// integration's (which it rarely fetches).
   (double, double)? get location {
-    final a = _attrs(E.location);
-    final lat = a['latitude'], lon = a['longitude'];
-    return (lat is num && lon is num) ? (lat.toDouble(), lon.toDouble()) : null;
+    for (final id in [E.parked, E.location]) {
+      final a = _attrs(id);
+      final lat = a['latitude'], lon = a['longitude'];
+      if (lat is num && lon is num) return (lat.toDouble(), lon.toDouble());
+    }
+    return null;
   }
+
+  /// "home", a zone's name, or the street, for "Parked at …".
+  String? get parkedAt {
+    final zone = _str(E.parked) ?? _str(E.location);
+    if (zone == 'home') return 'home';
+    if (zone != null && zone != 'not_home') return zone;
+    final address = _attrs(E.parked)['address'];
+    return address is String && address.isNotEmpty ? address : null;
+  }
+
+  DateTime? get locatedAt => DateTime.tryParse('${_attrs(E.parked)['located_at']}')?.toLocal();
 
   List<DailyStat> get dailyStats {
     final out = <DailyStat>[];

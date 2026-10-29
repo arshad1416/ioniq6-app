@@ -162,7 +162,7 @@ class HomeScreen extends StatelessWidget {
       _lockWord(store.lockState),
       if (car.charging) 'Charging' else if (car.plugged) 'Plugged in',
       if (car.climateOn) 'Climate on',
-      if (car.engineOn) 'On' else 'Parked',
+      if (car.engineOn) 'On' else if (car.parkedAt != null) 'Parked at ${car.parkedAt}' else 'Parked',
     ];
     return parts.join(' · ');
   }

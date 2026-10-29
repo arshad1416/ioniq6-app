@@ -14,6 +14,11 @@ abstract final class E {
   static const dailyStats = 'sensor.ioniq_6_daily_driving_stats';
   static const location = 'device_tracker.ioniq_6_location';
 
+  /// From the ioniq6_extras add-on (ha/custom_components): where the car was
+  /// last parked, asked for when the phone leaves the car or on request, with
+  /// the street address as an attribute.
+  static const parked = 'device_tracker.ioniq_6_parked';
+
   static const charging = 'binary_sensor.ioniq_6_ev_battery_charge';
   static const plugged = 'binary_sensor.ioniq_6_ev_battery_plug';
   static const chargePower = 'sensor.ioniq_6_ev_charging_power';
@@ -91,6 +96,7 @@ abstract final class E {
     dtcCount,
     dailyStats,
     location,
+    parked,
     charging,
     plugged,
     chargePower,

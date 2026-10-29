@@ -1,0 +1,89 @@
+# Ioniq 6 walk-away lock. Installed by ha/install.sh as
+# /opt/homeassistant/automations/27_ioniq6_walkaway_lock.yaml (a bare list,
+# because configuration.yaml merges automations/ with !include_dir_merge_list).
+#
+# Uses entities that already exist:
+#   binary_sensor.phone_connected_to_ioniq_6  (template helper, OnePlus 13 <-> car Bluetooth)
+#   input_boolean.walk_away_lock_dry_run      (on = notify only, never locks)
+#   lock.ioniq_6_door_lock and the IONIQ 6 door/trunk/hood/engine sensors (kia_uvo)
+
+- id: ioniq6_walk_away_lock
+  alias: "Ioniq 6: Walk-away lock"
+  description: >-
+    Locks the Ioniq 6 when the OnePlus 13 has been off the car's Bluetooth for 45 s,
+    the car is off, unlocked and fully closed. While "Walk-away lock dry run" is on it only notifies.
+  mode: restart
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.phone_connected_to_ioniq_6
+      from: "on"
+      to: "off"
+      for:
+        seconds: 45
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.ioniq_6_engine
+      state: "off"
+  actions:
+    # Read-only: ask the car for fresh lock/door state instead of trusting the last poll.
+    - action: button.press
+      target:
+        entity_id: button.ioniq_6_force_refresh
+    - wait_for_trigger:
+        - trigger: state
+          entity_id: sensor.ioniq_6_last_updated_at
+      timeout:
+        seconds: 90
+      continue_on_timeout: true
+    - if:
+        - condition: state
+          entity_id: lock.ioniq_6_door_lock
+          state: locked
+      then:
+        - stop: Already locked
+    - if:
+        - condition: or
+          conditions:
+            - condition: state
+              entity_id:
+                - binary_sensor.ioniq_6_front_left_door
+                - binary_sensor.ioniq_6_front_right_door
+                - binary_sensor.ioniq_6_back_left_door
+                - binary_sensor.ioniq_6_back_right_door
+                - binary_sensor.ioniq_6_trunk
+                - binary_sensor.ioniq_6_hood
+              state: "on"
+              match: any
+            - condition: state
+              entity_id: binary_sensor.ioniq_6_engine
+              state: "on"
+      then:
+        - action: notify.mobile_app_cph2655
+          data:
+            title: Walk-away lock skipped
+            message: >-
+              Your Ioniq 6 is unlocked but a door, trunk or hood is open (or the car is on),
+              so it wasn't locked.
+        - stop: Open or running
+    - if:
+        - condition: state
+          entity_id: input_boolean.walk_away_lock_dry_run
+          state: "on"
+      then:
+        - action: notify.mobile_app_cph2655
+          data:
+            title: Walk-away lock (dry run)
+            message: Your Ioniq 6 should be locked (test only, not locked)
+      else:
+        - action: lock.lock
+          target:
+            entity_id: lock.ioniq_6_door_lock
+        - wait_template: "{{ is_state('lock.ioniq_6_door_lock', 'locked') }}"
+          timeout:
+            seconds: 120
+        - action: notify.mobile_app_cph2655
+          data:
+            title: Walk-away lock
+            message: >-
+              {{ 'Locked your Ioniq 6 after you walked away.' if wait.completed
+                 else 'Sent a lock to your Ioniq 6 but it has not confirmed. Check the car.' }}

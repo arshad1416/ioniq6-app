@@ -157,6 +157,26 @@ class CarStore extends ChangeNotifier {
     return client.statistics(E.odometer, DateTime(now.year, now.month - 5));
   }
 
+  bool locating = false;
+
+  /// Asks the car where it is (Bluelink Find My Car, read-only) through the
+  /// ioniq6_extras add-on; the answer arrives as [E.parked].
+  Future<void> locate() async {
+    if (locating) return;
+    locating = true;
+    notifyListeners();
+    try {
+      if (isDemo) {
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+      } else {
+        await _client!.callService('ioniq6_extras', 'locate', {});
+      }
+    } finally {
+      locating = false;
+      notifyListeners();
+    }
+  }
+
   /// Sends [cmd] to the car. Callers reach this only from a press-and-hold.
   Future<void> send(CarCommand cmd) async {
     if (!settings.commandsEnabled && !isDemo) throw CommandsDisabled();

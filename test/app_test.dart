@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ioniq6_companion/car/car_store.dart';
 import 'package:ioniq6_companion/car/settings.dart';
 import 'package:ioniq6_companion/main.dart';
-import 'package:ioniq6_companion/screens/home.dart';
 import 'package:ioniq6_companion/widgets/rive_view.dart';
 
 Future<CarStore> pumpApp(WidgetTester tester) async {
@@ -26,21 +25,10 @@ void main() {
     expect(find.textContaining('Demo mode'), findsOneWidget);
   });
 
-  testWidgets('dragging turns the car, then it settles back', (tester) async {
+  testWidgets('home shows the photo of the car', (tester) async {
     await pumpApp(tester);
-    String shown() =>
-        (tester.widget<Image>(find.descendant(of: find.byType(Turntable), matching: find.byType(Image))).image
-                as AssetImage)
-            .assetName;
-    expect(shown(), Turntable.frame(Turntable.rest));
-    final gesture = await tester.startGesture(tester.getCenter(find.byType(Turntable)));
-    await gesture.moveBy(const Offset(-20, 0));
-    await gesture.moveBy(const Offset(-120, 0));
-    await tester.pump();
-    expect(shown(), isNot(Turntable.frame(Turntable.rest)));
-    await gesture.up();
-    await tester.pumpAndSettle();
-    expect(shown(), Turntable.frame(Turntable.rest));
+    final assets = tester.widgetList<Image>(find.byType(Image)).map((i) => (i.image as AssetImage).assetName);
+    expect(assets, contains('assets/images/hero.webp'));
   });
 
   testWidgets('miles and Fahrenheit change what Home shows', (tester) async {

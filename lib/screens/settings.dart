@@ -146,7 +146,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Lbl('Car'),
         RowsCard(
           children: [
-            _soonRow(Glyphs.person, 'Driver profiles', sub: 'Seat, mirrors and climate per driver'),
             _soonRow(Glyphs.key, 'Digital Key', sub: 'Phone and card keys for this car'),
             NavRow(
               glyph: const LineIcon(Glyphs.walk),

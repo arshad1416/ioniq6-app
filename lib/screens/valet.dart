@@ -13,44 +13,16 @@ void _setInCar(BuildContext context) => ScaffoldMessenger.of(context)
     const SnackBar(content: Text('Bluelink Canada can only turn valet mode on and off. Change this in the car.')),
   );
 
-/// Turns valet mode on or off with a hold. Needs the Ioniq 6 Extras add-on in
-/// Home Assistant; until it's there the switch explains what's missing.
+/// Turns valet mode on or off with a hold (needs the Ioniq 6 Extras add-on).
 class ValetToggle extends StatelessWidget {
   const ValetToggle({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final store = AppScope.of(context);
-    final on = store.car.valetOn;
-    if (on == null && !store.isDemo) {
-      return GestureDetector(
-        onTap: () => ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(content: Text('Install the Ioniq 6 Extras add-on in Home Assistant to use valet mode.')),
-          ),
-        child: const Switch(value: false, onChanged: null),
-      );
-    }
-    final value = on ?? false;
-    return HoldButton(
-      enabled: store.pending == null,
-      onHeld: () => runCommand(context, ValetCommand(on: !value)),
-      builder: (context, p) => Stack(
-        alignment: Alignment.center,
-        children: [
-          IgnorePointer(
-            child: Switch(value: value, onChanged: (_) {}),
-          ),
-          if (p > 0)
-            SizedBox.square(
-              dimension: 30,
-              child: CircularProgressIndicator(value: p, strokeWidth: 2, color: Palette.red),
-            ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => HoldSwitch(
+    value: AppScope.of(context).car.valetOn,
+    command: (on) => ValetCommand(on: on),
+    missing: 'Install the Ioniq 6 Extras add-on in Home Assistant to use valet mode.',
+  );
 }
 
 /// Valet settings. Bluelink Canada can only switch valet mode on and off;

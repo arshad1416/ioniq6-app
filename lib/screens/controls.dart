@@ -97,7 +97,7 @@ class ControlsScreen extends StatelessWidget {
             StatusChip(car.hoodOpen ? 'Hood open' : 'Hood closed', ok: !car.hoodOpen),
           ],
         ),
-        const _ValetSwitch(),
+        const _Switches(),
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
@@ -132,8 +132,71 @@ class ControlsScreen extends StatelessWidget {
   }
 }
 
-/// Valet mode limits what a valet can see and do in the car. It's switched
-/// through the Ioniq 6 Extras add-on with a hold; the gear opens its settings.
+/// Valet mode and battery preconditioning, each switched with a hold through
+/// the Ioniq 6 Extras add-on, in one outlined card.
+class _Switches extends StatelessWidget {
+  const _Switches();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF3A3A3C)),
+    ),
+    child: const Column(
+      children: [
+        _ValetSwitch(),
+        Divider(color: Color(0xFF3A3A3C), height: 1),
+        _PreconditionSwitch(),
+      ],
+    ),
+  );
+}
+
+/// Warms the battery so the next fast charge is quicker (Bluelink
+/// preconditioning). Uses some charge, so it's a hold like other commands.
+class _PreconditionSwitch extends StatelessWidget {
+  const _PreconditionSwitch();
+
+  @override
+  Widget build(BuildContext context) {
+    final on = AppScope.of(context).car.preconditioningOn;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      child: Row(
+        children: [
+          const LineIcon(Glyphs.thermometer, size: 22, color: Palette.light),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Battery preconditioning', style: Txt.body(16), overflow: TextOverflow.ellipsis),
+                Text(
+                  switch (on) {
+                    true => 'Warming for fast charging',
+                    false => 'Warms the battery before a fast charge',
+                    null => 'Not set up',
+                  },
+                  style: Txt.muted(13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          HoldSwitch(
+            value: on,
+            command: (on) => PreconditionCommand(on: on),
+            missing: 'Install the Ioniq 6 Extras add-on in Home Assistant to warm the battery.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Valet mode limits what a valet can see and do in the car; the gear opens
+/// its settings.
 class _ValetSwitch extends StatelessWidget {
   const _ValetSwitch();
 
@@ -142,12 +205,8 @@ class _ValetSwitch extends StatelessWidget {
     final store = AppScope.of(context);
     final v = store.settings.valet;
     final car = store.car;
-    return Container(
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3A3A3C)),
-      ),
       child: Row(
         children: [
           const LineIcon(Glyphs.valet, size: 22, color: Palette.light),

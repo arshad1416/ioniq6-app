@@ -93,6 +93,48 @@ Future<void> runCommand(BuildContext context, CarCommand cmd) async {
   }
 }
 
+/// A switch that only changes with a press-and-hold, sending [command] for
+/// the new value. When [value] is null (the add-on isn't installed) it shows
+/// off and explains [missing] on tap.
+class HoldSwitch extends StatelessWidget {
+  const HoldSwitch({super.key, required this.value, required this.command, required this.missing});
+  final bool? value;
+  final CarCommand Function(bool on) command;
+  final String missing;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = AppScope.of(context);
+    final v = value;
+    if (v == null && !store.isDemo) {
+      return GestureDetector(
+        onTap: () => ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(missing))),
+        child: const Switch(value: false, onChanged: null),
+      );
+    }
+    final on = v ?? false;
+    return HoldButton(
+      enabled: store.pending == null,
+      onHeld: () => runCommand(context, command(!on)),
+      builder: (context, p) => Stack(
+        alignment: Alignment.center,
+        children: [
+          IgnorePointer(
+            child: Switch(value: on, onChanged: (_) {}),
+          ),
+          if (p > 0)
+            SizedBox.square(
+              dimension: 30,
+              child: CircularProgressIndicator(value: p, strokeWidth: 2, color: Palette.red),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Ring drawn around a hold control while it fills.
 class HoldRing extends StatelessWidget {
   const HoldRing({super.key, required this.progress, required this.child, this.size = 44});

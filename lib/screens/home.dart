@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../car/car_state.dart';
 import '../car/car_store.dart';
 import '../car/commands.dart';
+import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
@@ -71,59 +73,64 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Text('${car.rangeKm ?? '–'}', style: Txt.display(34)),
+                  RollingNumber('${car.rangeKm ?? '–'}', style: Txt.display(34)),
                   Text(' km', style: Txt.display(15)),
                   const SizedBox(width: 12),
                   Flexible(child: PixelBar(pct: soc)),
                   const SizedBox(width: 12),
-                  Text('$soc%', style: Txt.display(15)),
+                  RollingNumber('$soc%', style: Txt.display(15)),
                   if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 18),
                 ],
               ),
-              _Hero(onTap: () => Navigator.pushNamed(context, '/controls')),
-              _QuickActions(store: store),
+              StaggerIn(index: 0, child: _Hero(onTap: () => Navigator.pushNamed(context, '/controls'))),
+              StaggerIn(index: 1, child: _QuickActions(store: store)),
               const SizedBox(height: 14),
-              RowsCard(
-                children: [
-                  NavRow(
-                    icon: Icons.directions_car_outlined,
-                    label: 'Controls',
-                    value: car.allClosed ? _lockWord(store.lockState) : 'Something is open',
-                    onTap: () => Navigator.pushNamed(context, '/controls'),
-                  ),
-                  NavRow(
-                    icon: Icons.thermostat_outlined,
-                    label: 'Climate',
-                    value: car.climateOn ? 'On · ${_t(car.setTempC)}' : 'Off · set ${_t(store.settings.climate.tempC)}',
-                    onTap: () => Navigator.pushNamed(context, '/climate'),
-                  ),
-                  NavRow(
-                    icon: Icons.bolt_outlined,
-                    label: 'Charging',
-                    value: car.charging
-                        ? 'Charging · ${duration(car.chargeMinutesLeft ?? 0)} left'
-                        : '${car.plugged ? 'Plugged in' : 'Unplugged'} · limit ${car.acLimit}%',
-                    onTap: () => Navigator.pushNamed(context, '/charging'),
-                  ),
-                  NavRow(
-                    icon: Icons.bar_chart,
-                    label: 'Stats',
-                    value: '${thousands(car.odometerKm)} km',
-                    onTap: () => Navigator.pushNamed(context, '/stats'),
-                  ),
-                  NavRow(
-                    icon: Icons.favorite_border,
-                    label: 'Health',
-                    value: car.healthOk ? 'All good' : 'Needs a look',
-                    onTap: () => Navigator.pushNamed(context, '/health'),
-                  ),
-                  NavRow(
-                    icon: Icons.show_chart,
-                    label: 'Activity',
-                    value: store.activity.isEmpty ? null : store.activity.first.title,
-                    onTap: () => Navigator.pushNamed(context, '/activity'),
-                  ),
-                ],
+              StaggerIn(
+                index: 2,
+                child: RowsCard(
+                  children: [
+                    NavRow(
+                      icon: Icons.directions_car_outlined,
+                      label: 'Controls',
+                      value: car.allClosed ? _lockWord(store.lockState) : 'Something is open',
+                      onTap: () => Navigator.pushNamed(context, '/controls'),
+                    ),
+                    NavRow(
+                      icon: Icons.thermostat_outlined,
+                      label: 'Climate',
+                      value: car.climateOn
+                          ? 'On · ${_t(car.setTempC)}'
+                          : 'Off · set ${_t(store.settings.climate.tempC)}',
+                      onTap: () => Navigator.pushNamed(context, '/climate'),
+                    ),
+                    NavRow(
+                      icon: Icons.bolt_outlined,
+                      label: 'Charging',
+                      value: car.charging
+                          ? 'Charging · ${duration(car.chargeMinutesLeft ?? 0)} left'
+                          : '${car.plugged ? 'Plugged in' : 'Unplugged'} · limit ${car.acLimit}%',
+                      onTap: () => Navigator.pushNamed(context, '/charging'),
+                    ),
+                    NavRow(
+                      icon: Icons.bar_chart,
+                      label: 'Stats',
+                      value: '${thousands(car.odometerKm)} km',
+                      onTap: () => Navigator.pushNamed(context, '/stats'),
+                    ),
+                    NavRow(
+                      icon: Icons.favorite_border,
+                      label: 'Health',
+                      value: car.healthOk ? 'All good' : 'Needs a look',
+                      onTap: () => Navigator.pushNamed(context, '/health'),
+                    ),
+                    NavRow(
+                      icon: Icons.show_chart,
+                      label: 'Activity',
+                      value: store.activity.isEmpty ? null : store.activity.first.title,
+                      onTap: () => Navigator.pushNamed(context, '/activity'),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 14),
               Center(
@@ -320,6 +327,7 @@ class Turntable extends StatefulWidget {
 class _TurntableState extends State<Turntable> with SingleTickerProviderStateMixin {
   late final AnimationController _settle = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))
     ..addListener(() => setState(() => _pos = _from + (_to - _from) * Curves.easeOutCubic.transform(_settle.value)));
+  static const _quarter = Turntable.frames / 4;
   double _pos = Turntable.rest.toDouble(), _from = 0, _to = 0;
 
   @override
@@ -350,7 +358,11 @@ class _TurntableState extends State<Turntable> with SingleTickerProviderStateMix
     final i = _pos.round() % Turntable.frames;
     return GestureDetector(
       onHorizontalDragStart: (_) => _settle.stop(),
-      onHorizontalDragUpdate: (d) => setState(() => _pos -= d.delta.dx / Turntable._pxPerFrame),
+      onHorizontalDragUpdate: (d) {
+        final before = (_pos / _quarter).floor();
+        setState(() => _pos -= d.delta.dx / Turntable._pxPerFrame);
+        if ((_pos / _quarter).floor() != before) HapticFeedback.selectionClick();
+      },
       onHorizontalDragEnd: (_) => _release(),
       behavior: HitTestBehavior.opaque,
       child: SizedBox.expand(

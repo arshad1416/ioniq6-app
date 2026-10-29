@@ -10,6 +10,7 @@ import 'screens/controls.dart';
 import 'screens/home.dart';
 import 'screens/info_screens.dart';
 import 'screens/settings.dart';
+import 'motion.dart';
 import 'theme.dart';
 import 'update/update_prompt.dart';
 import 'widgets/common.dart';
@@ -46,16 +47,21 @@ class CompanionApp extends StatelessWidget {
       navigatorKey: navigator,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      routes: {
-        '/': (_) => const HomeScreen(),
-        '/controls': (_) => const ControlsScreen(),
-        '/climate': (_) => const ClimateScreen(),
-        '/charging': (_) => const ChargingScreen(),
-        '/stats': (_) => const StatsScreen(),
-        '/health': (_) => const HealthScreen(),
-        '/activity': (_) => const ActivityScreen(),
-        '/settings': (_) => const SettingsScreen(),
+      onGenerateRoute: (settings) {
+        final page = _pages[settings.name];
+        return page == null ? null : FadeRiseRoute(builder: page, settings: settings);
       },
     ),
   );
+
+  static final Map<String, WidgetBuilder> _pages = {
+    '/': (_) => const HomeScreen(),
+    '/controls': (_) => const ControlsScreen(),
+    '/climate': (_) => const ClimateScreen(),
+    '/charging': (_) => const ChargingScreen(),
+    '/stats': (_) => const StatsScreen(),
+    '/health': (_) => const HealthScreen(),
+    '/activity': (_) => const ActivityScreen(),
+    '/settings': (_) => const SettingsScreen(),
+  };
 }

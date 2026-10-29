@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../car/commands.dart';
+import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
@@ -15,6 +17,7 @@ class ChargingScreen extends StatefulWidget {
 
 class _ChargingScreenState extends State<ChargingScreen> {
   int? _draftLimit;
+  bool _sliding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -80,13 +83,28 @@ class _ChargingScreenState extends State<ChargingScreen> {
             ),
             if (car.charging && car.chargeKw != null)
               Text('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(13)),
-            Slider(
-              value: limit.toDouble(),
-              min: 50,
-              max: 100,
-              divisions: 5,
-              label: '$limit%',
-              onChanged: (v) => setState(() => _draftLimit = v.round()),
+            // The track thickens while touched, and each 10% step clicks.
+            TweenAnimationBuilder<double>(
+              tween: Tween(end: _sliding ? 12 : 6),
+              duration: Motion.micro,
+              curve: Motion.slider,
+              builder: (context, h, child) => SliderTheme(
+                data: SliderTheme.of(context).copyWith(trackHeight: h),
+                child: child!,
+              ),
+              child: Slider(
+                value: limit.toDouble(),
+                min: 50,
+                max: 100,
+                divisions: 5,
+                label: '$limit%',
+                onChangeStart: (_) => setState(() => _sliding = true),
+                onChangeEnd: (_) => setState(() => _sliding = false),
+                onChanged: (v) {
+                  if (v.round() != limit) HapticFeedback.selectionClick();
+                  setState(() => _draftLimit = v.round());
+                },
+              ),
             ),
             if (changed)
               HoldButton(

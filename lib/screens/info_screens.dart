@@ -207,8 +207,8 @@ class _TireMap extends StatelessWidget {
 
   // Where things sit in top.webp once turned upright (front at the top), as
   // fractions of the image: the body's sides and the two axles.
-  static const _bodyLeft = .24, _bodyRight = .76, _frontAxle = .217, _rearAxle = .743;
-  static const _height = 300.0, _aspect = 750 / 1200;
+  static const _bodyLeft = .24, _bodyRight = .76, _frontAxle = .21, _rearAxle = .77;
+  static const _height = 340.0, _aspect = 750 / 1200;
 
   @override
   Widget build(BuildContext context) => SizedBox(

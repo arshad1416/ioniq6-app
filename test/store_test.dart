@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ioniq6_companion/car/car_state.dart';
 import 'package:ioniq6_companion/car/car_store.dart';
@@ -87,5 +89,27 @@ void main() {
     expect(data['flseat'], '8');
     expect(data['frseat'], '0');
     expect(data['steering_wheel'], '1');
+  });
+
+  test('retries quietly before showing a connection error', () {
+    fakeAsync((time) {
+      final backend = MemorySettingsBackend()
+        ..values.addAll({'haUrl': 'http://ha.test:8123', 'token': 't', 'demo': 'false'});
+      var attempts = 0;
+      final store = CarStore(
+        Settings(backend),
+        clientFactory: (_, _) {
+          attempts++;
+          if (attempts <= 2) throw Exception('Failed host lookup');
+          return FakeHa();
+        },
+      );
+      final seen = <Connection>[];
+      store.addListener(() => seen.add(store.connection));
+      store.start();
+      time.elapse(const Duration(seconds: 10));
+      expect(store.connection, Connection.live);
+      expect(seen, isNot(contains(Connection.error)));
+    });
   });
 }

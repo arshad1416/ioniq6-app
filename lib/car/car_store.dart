@@ -45,6 +45,11 @@ class CarStore extends ChangeNotifier {
   HaClient? _client;
   StreamSubscription<EntityState>? _sub;
   Timer? _retry, _pendingTimeout;
+  int _failures = 0;
+
+  /// Quick, silent retries before the error banner shows. Right after the
+  /// phone wakes or switches networks, DNS often fails for a few seconds.
+  static const _quietRetries = [Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
 
   bool get isDemo => connection == Connection.demo;
   DoorLock get lockState => lockOverride ?? car.lock;
@@ -96,6 +101,7 @@ class CarStore extends ChangeNotifier {
         notifyListeners();
       }, onError: (Object e) => _fail(e));
       connection = Connection.live;
+      _failures = 0;
       notifyListeners();
       unawaited(loadHistory());
     } catch (e) {
@@ -104,10 +110,14 @@ class CarStore extends ChangeNotifier {
   }
 
   void _fail(Object e) {
+    _retry?.cancel();
+    if (_failures < _quietRetries.length) {
+      _retry = Timer(_quietRetries[_failures++], connect);
+      return; // still "connecting"; the last known state stays on screen
+    }
     connection = Connection.error;
     error = '$e';
     notifyListeners();
-    _retry?.cancel();
     _retry = Timer(const Duration(seconds: 20), connect);
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../car/commands.dart';
+import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
@@ -24,74 +25,15 @@ class ClimateScreen extends StatelessWidget {
       scroll: false,
       children: [
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, box) {
-              Widget seat(SeatLevel level, void Function() onTap, double x, String label) => Positioned(
-                left: box.maxWidth * x - 22,
-                top: box.maxHeight * .555 - 22,
-                child: Semantics(
-                  label: '$label seat heat ${level.name}',
-                  button: true,
-                  child: GestureDetector(
-                    onTap: onTap,
-                    child: SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Icon(
-                            Icons.waves,
-                            size: 24,
-                            color: level == SeatLevel.off ? const Color(0xFF9A9A9E) : Palette.red,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            child: Text(level.badge, style: Txt.mono(9, weight: 600, color: Palette.red)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  Hero(
-                    tag: 'car',
-                    child: Image.asset(
-                      'assets/images/top_v.webp',
-                      fit: BoxFit.contain,
-                      semanticLabel: 'Cabin from above',
-                    ),
-                  ),
-                  IgnorePointer(
-                    child: SizedBox(
-                      width: 160,
-                      height: 160,
-                      child: RiveView(
-                        asset: 'assets/rive/ioniq6_climate.riv',
-                        values: {'on': on, 'mode': heating ? 1 : 0, 'progress': progress},
-                        fallback: const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
-                  seat(
-                    req.driverSeat,
-                    () => store.updateClimate(req.copyWith(driverSeat: req.driverSeat.next)),
-                    .31,
-                    'Driver',
-                  ),
-                  seat(
-                    req.passengerSeat,
-                    () => store.updateClimate(req.copyWith(passengerSeat: req.passengerSeat.next)),
-                    .69,
-                    'Passenger',
-                  ),
-                ],
-              );
-            },
+          child: _Cabin(
+            req: req,
+            rive: RiveView(
+              asset: 'assets/rive/ioniq6_climate.riv',
+              values: {'on': on, 'mode': heating ? 1 : 0, 'progress': progress},
+              fallback: const SizedBox.shrink(),
+            ),
+            onDriver: () => store.updateClimate(req.copyWith(driverSeat: req.driverSeat.next)),
+            onPassenger: () => store.updateClimate(req.copyWith(passengerSeat: req.passengerSeat.next)),
           ),
         ),
         Container(
@@ -186,7 +128,7 @@ class ClimateScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _Wide(
-                  icon: Icons.window,
+                  icon: (color) => CustomPaint(size: const Size.square(26), painter: _DefrostIcon(color)),
                   label: 'Defrost car',
                   on: req.defrost,
                   onTap: () => store.updateClimate(req.copyWith(defrost: !req.defrost)),
@@ -210,7 +152,7 @@ class ClimateScreen extends StatelessWidget {
 
 class _Wide extends StatelessWidget {
   const _Wide({required this.icon, required this.label, required this.on, required this.onTap});
-  final IconData icon;
+  final Widget Function(Color color) icon;
   final String label;
   final bool on;
   final VoidCallback onTap;
@@ -227,11 +169,155 @@ class _Wide extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: on ? Palette.red : Palette.light),
+          icon(on ? Palette.red : Palette.light),
           const SizedBox(width: 14),
           Text(label, style: Txt.body(14)),
         ],
       ),
     ),
   );
+}
+
+/// The cabin from above. The front seats sit under a smoked-glass pane, like
+/// the panoramic roof, and a heated seat glows red beneath it.
+class _Cabin extends StatelessWidget {
+  const _Cabin({required this.req, required this.rive, required this.onDriver, required this.onPassenger});
+  final ClimateRequest req;
+  final Widget rive;
+  final VoidCallback onDriver, onPassenger;
+
+  // Measured on top_v.webp (237×560) as fractions of the image.
+  static const _aspect = 237 / 560;
+  static const _seatY = .553, _driverX = .292, _passengerX = .708;
+  static const _glass = Rect.fromLTRB(.15, .466, .85, .632);
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      // Same maths as BoxFit.contain, so the overlays land on the seats.
+      final h = box.maxHeight.clamp(0.0, box.maxWidth / _aspect);
+      final img = Rect.fromCenter(center: box.biggest.center(Offset.zero), width: h * _aspect, height: h);
+      Offset at(double x, double y) => Offset(img.left + img.width * x, img.top + img.height * y);
+      final glass = Rect.fromPoints(at(_glass.left, _glass.top), at(_glass.right, _glass.bottom));
+
+      Widget seat(SeatLevel level, VoidCallback onTap, double x, String label) {
+        final c = at(x, _seatY);
+        final heated = level != SeatLevel.off;
+        return Positioned(
+          left: c.dx - 30,
+          top: c.dy - 30,
+          width: 60,
+          height: 60,
+          child: Semantics(
+            label: '$label seat heat ${level.name}',
+            button: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedOpacity(
+                    opacity: heated ? 1 : 0,
+                    duration: Motion.nav,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          colors: [
+                            Palette.red.withValues(alpha: .25 + .15 * level.index),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                  Icon(Icons.waves, size: 24, color: heated ? Palette.red : const Color(0xFF9A9A9E)),
+                  Positioned(
+                    bottom: 8,
+                    child: Text(level.badge, style: Txt.mono(9, weight: 600, color: Palette.red)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Stack(
+        children: [
+          Positioned.fromRect(
+            rect: img,
+            child: Hero(
+              tag: 'car',
+              child: Image.asset('assets/images/top_v.webp', fit: BoxFit.fill, semanticLabel: 'Cabin from above'),
+            ),
+          ),
+          seat(req.driverSeat, onDriver, _driverX, 'Driver'),
+          seat(req.passengerSeat, onPassenger, _passengerX, 'Passenger'),
+          // Smoked glass with a light sheen, over the seats but not their taps.
+          Positioned.fromRect(
+            rect: glass,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white.withValues(alpha: .14),
+                      const Color(0xFF0B0B0C).withValues(alpha: .35),
+                      const Color(0xFF0B0B0C).withValues(alpha: .45),
+                      Colors.white.withValues(alpha: .06),
+                    ],
+                    stops: const [0, .35, .8, 1],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Center(
+            child: IgnorePointer(child: SizedBox.square(dimension: 160, child: rive)),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+/// The standard defrost symbol: a window with three wavy arrows rising through it.
+class _DefrostIcon extends CustomPainter {
+  const _DefrostIcon(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final u = size.width / 24;
+    final pen = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6 * u
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawRRect(RRect.fromLTRBR(1.5 * u, 3 * u, 22.5 * u, 15.5 * u, Radius.circular(1.5 * u)), pen);
+    for (final x in [7.0, 12.0, 17.0]) {
+      final path = Path()
+        ..moveTo(x * u, 22 * u)
+        ..cubicTo((x - 1.8) * u, 19.5 * u, (x + 1.8) * u, 16.5 * u, x * u, 13.5 * u)
+        ..cubicTo((x - 1.4) * u, 11.5 * u, (x + .8) * u, 9.5 * u, x * u, 7 * u);
+      canvas.drawPath(path, pen);
+      canvas.drawPath(
+        Path()
+          ..moveTo((x - 1.4) * u, 8.4 * u)
+          ..lineTo(x * u, 6.6 * u)
+          ..lineTo((x + 1.4) * u, 8.4 * u),
+        pen,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DefrostIcon old) => old.color != color;
 }

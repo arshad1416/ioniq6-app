@@ -36,9 +36,9 @@ class FakeApi:
         self.answers, self.calls = answers, []
         self.sessions = SimpleNamespace(post=self.post)
 
-    def post(self, url, headers, json):
+    def post(self, url, headers, json=None, data=None):
         path = url.removeprefix(self.API_URL)
-        self.calls.append((path, headers, json))
+        self.calls.append((path, headers, json if data is None else data))
         answer = self.answers[path]
         return answer if isinstance(answer, FakeResponse) else FakeResponse(answer)
 
@@ -129,7 +129,9 @@ def test_request_svm_accepts_empty_reply():
     b.request_svm()
     path, headers, body = api.calls[0]
     assert (path, body) == ("vrfypin", {"pin": "1234"}) and headers["accessToken"] == "AT"
-    assert api.calls[1][0] == "rfc/fndmcrsvm" and api.calls[1][1]["pAuth"] == "PAUTH"
+    path, headers, body = api.calls[1]
+    assert path == "rfc/fndmcrsvm" and body == b"" and "pAuth" not in headers
+    assert (headers["from"], headers["brand"], headers["vehicleId"]) == ("SPA", "H", "REGID")
 
 
 def test_http_error_without_json_is_readable():

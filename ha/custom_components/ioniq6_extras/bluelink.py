@@ -201,9 +201,16 @@ class Bluelink:
     def request_svm(self) -> None:
         """Asks the car to take new 360 shots. A car command with daily and
         monthly limits; only ever called from the take_360_shots service."""
-        # Like every remote command, it needs the pAuth token; without it
-        # Bluelink answers 6459 "request could not be processed".
-        self._post("rfc/fndmcrsvm", pin=True)
+        # Sent exactly as the phone app does: the PIN check is only a gate (its
+        # pAuth isn't passed on), then the request with the app's own headers
+        # and no body. The library's web-portal headers get 6459.
+        self._pin_token(self._headers(pin=False))
+        headers = self._headers(pin=False)
+        for web in ("Origin", "Referer", "Sec-Fetch-Dest", "Sec-Fetch-Mode", "Sec-Fetch-Site"):
+            headers.pop(web, None)
+        headers.update({"from": "SPA", "brand": "H", "Content-Type": "application/json"})
+        response = self._api.sessions.post(self._api.API_URL + "rfc/fndmcrsvm", headers=headers, data=b"")
+        self._check(_json(response))
 
     def last_svm(self) -> SvmShots | None:
         """The latest stored 360 shots (read only)."""

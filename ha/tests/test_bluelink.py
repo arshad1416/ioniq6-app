@@ -59,15 +59,10 @@ def test_locate_uses_ev_call_with_pin_header():
     b, api = make({"evc/fme": {**OK, "result": {"coord": {"lat": 43.7, "lon": -79.4}, "head": 90}}})
     loc = b.locate()
     assert (loc.lat, loc.lon, loc.heading) == (43.7, -79.4, 90)
-    path, headers, _ = api.calls[1]
+    path, headers, body = api.calls[1]
     assert path == "evc/fme" and headers["pAuth"] == "PAUTH" and headers["vehicleId"] == "REGID"
+    assert (headers["from"], headers["brand"], body) == ("SPA", "H", b"")
     assert FakeApi.API_HEADERS.get("pAuth") is None  # shared headers untouched
-
-
-def test_locate_falls_back_to_fndmcr():
-    err = {"responseHeader": {"responseCode": 1}, "error": {"errorCode": "7445"}}
-    b, _ = make({"evc/fme": err, "fndmcr": {**OK, "result": {"coord": {"lat": 1.0, "lon": 2.0}}}})
-    assert b.locate().lat == 1.0
 
 
 @pytest.mark.parametrize(("mode", "on"), [(0, True), (3, True), (1, False), (None, False)])

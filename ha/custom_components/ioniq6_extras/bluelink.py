@@ -96,6 +96,11 @@ class Bluelink:
         # stale one makes Bluelink reject the next call.
         for stale in ("pAuth", "transactionId", "accessToken", "vehicleId"):
             headers.pop(stale, None)
+        # The library talks like the web portal; Bluelink refuses some calls
+        # from there (6459), so talk like the phone app instead.
+        for web in ("Origin", "Referer", "Sec-Fetch-Dest", "Sec-Fetch-Mode", "Sec-Fetch-Site"):
+            headers.pop(web, None)
+        headers.update({"from": "SPA", "brand": "H", "Content-Type": "application/json"})
         headers["offset"] = str(int(datetime.now().astimezone().utcoffset().total_seconds() // 3600))
         headers["accessToken"] = token.access_token
         headers["vehicleId"] = self._vehicle.id
@@ -125,32 +130,23 @@ class Bluelink:
         return data
 
     def _post(self, path: str, *, pin: bool = False, body: dict[str, Any] | None = None):
-        response = self._api.sessions.post(self._api.API_URL + path, headers=self._headers(pin), json=body or {})
+        url, headers = self._api.API_URL + path, self._headers(pin)
+        if body is None:  # the app sends these with no body at all
+            response = self._api.sessions.post(url, headers=headers, data=b"")
+        else:
+            response = self._api.sessions.post(url, headers=headers, json=body)
         return self._check(_json(response)), response.headers
 
     # Location ---------------------------------------------------------------
 
     def locate(self) -> Location | None:
-        """Find My Car (read only). evc/fme is the EV call; fndmcr the general one."""
-        last: Exception | None = None
-        for path in ("evc/fme", "fndmcr"):
-            try:
-                data, _ = self._post(path, pin=True)
-            except Exception as err:  # noqa: BLE001 - try the other call
-                last = err
-                continue
-            result = data.get("result") or {}
-            coord = result.get("coord") or (result.get("gpsDetail") or {}).get("coord") or {}
-            if coord.get("lat") is not None and coord.get("lon") is not None:
-                return Location(
-                    lat=float(coord["lat"]),
-                    lon=float(coord["lon"]),
-                    heading=result.get("head"),
-                    time=result.get("time"),
-                )
-        if last:
-            raise last
-        return None
+        """Find My Car (read only), with the app's EV call."""
+        data, _ = self._post("evc/fme", pin=True)
+        result = data.get("result") or {}
+        coord = result.get("coord") or (result.get("gpsDetail") or {}).get("coord") or {}
+        if coord.get("lat") is None or coord.get("lon") is None:
+            return None
+        return Location(lat=float(coord["lat"]), lon=float(coord["lon"]), heading=result.get("head"), time=result.get("time"))
 
     # Valet ------------------------------------------------------------------
 
@@ -201,16 +197,10 @@ class Bluelink:
     def request_svm(self) -> None:
         """Asks the car to take new 360 shots. A car command with daily and
         monthly limits; only ever called from the take_360_shots service."""
-        # Sent exactly as the phone app does: the PIN check is only a gate (its
-        # pAuth isn't passed on), then the request with the app's own headers
-        # and no body. The library's web-portal headers get 6459.
+        # As the phone app does it: the PIN check is only a gate (its pAuth
+        # isn't passed on), then the request with no body.
         self._pin_token(self._headers(pin=False))
-        headers = self._headers(pin=False)
-        for web in ("Origin", "Referer", "Sec-Fetch-Dest", "Sec-Fetch-Mode", "Sec-Fetch-Site"):
-            headers.pop(web, None)
-        headers.update({"from": "SPA", "brand": "H", "Content-Type": "application/json"})
-        response = self._api.sessions.post(self._api.API_URL + "rfc/fndmcrsvm", headers=headers, data=b"")
-        self._check(_json(response))
+        self._post("rfc/fndmcrsvm")
 
     def last_svm(self) -> SvmShots | None:
         """The latest stored 360 shots (read only)."""

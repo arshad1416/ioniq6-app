@@ -1,0 +1,25 @@
+# Ioniq 6: ask the car where it's parked when the phone leaves it.
+# Installed by ha/install.sh into /opt/homeassistant/automations/.
+# Read only (Bluelink Find My Car through the ioniq6_extras add-on); updates
+# device_tracker.ioniq_6_parked, which the phone app shows as "Parked at …".
+
+- id: ioniq6_locate_on_park
+  alias: "Ioniq 6: Locate when parked"
+  description: >-
+    Asks the car for its location a minute after the OnePlus 13 leaves its Bluetooth
+    with the car off, so the app can say where it's parked.
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.phone_connected_to_ioniq_6
+      from: "on"
+      to: "off"
+      for:
+        seconds: 60
+  conditions:
+    - condition: state
+      entity_id: binary_sensor.ioniq_6_engine
+      state: "off"
+  actions:
+    - action: ioniq6_extras.locate
+      continue_on_error: true

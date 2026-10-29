@@ -58,7 +58,12 @@ class CarState {
   bool get climateOn => _on(E.climateSwitch) || (_str(E.climate) != null && _str(E.climate) != 'off');
   double? get setTempC => _num(E.setTemp);
   double? get cabinTempC => (_attrs(E.climate)['current_temperature'] as num?)?.toDouble();
-  double? get outsideTempC => (_attrs(E.weather)['temperature'] as num?)?.toDouble();
+
+  /// The car doesn't report outside temperature, so this is Home Assistant's
+  /// weather, shown only while the car is known to be at home where that
+  /// weather applies.
+  double? get outsideTempC =>
+      _str(E.location) == 'home' ? (_attrs(E.weather)['temperature'] as num?)?.toDouble() : null;
   bool get defrostOn => _on(E.defrost);
   bool get wheelHeatOn => _on(E.wheelHeat);
 

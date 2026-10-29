@@ -219,7 +219,9 @@ class WideButton extends StatelessWidget {
         children: [
           icon(on ? Palette.red : Palette.light),
           const SizedBox(width: 14),
-          Flexible(child: Text(label, style: Txt.body(16), overflow: TextOverflow.ellipsis)),
+          Flexible(
+            child: Text(label, style: Txt.body(16), overflow: TextOverflow.ellipsis),
+          ),
         ],
       ),
     ),

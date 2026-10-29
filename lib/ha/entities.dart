@@ -23,10 +23,21 @@ abstract final class E {
   static const acLimit = 'number.ioniq_6_ac_charging_limit';
   static const dcLimit = 'number.ioniq_6_dc_charging_limit';
 
+  /// The Ioniq's charging energy and cost, tracked in Home Assistant.
+  static const energyMonth = 'sensor.ioniq_6_energy_monthly';
+  static const costMonth = 'sensor.ioniq_6_cost_monthly';
+
+  /// The Grizzl-E home charger, shared with the VF9. [chargerVehicle] says
+  /// which car it is charging, with the session's kWh as an attribute.
+  static const chargerPower = 'sensor.grizzl_e_power';
+  static const chargerCharging = 'binary_sensor.grizzl_e_charging';
+  static const chargerSessionCost = 'sensor.grizzl_e_session_cost';
+  static const chargerVehicle = 'sensor.ev_charging_vehicle_detected';
+
   static const climateSwitch = 'switch.ioniq_6_climate';
   static const climate = 'climate.ioniq_6_climate_control';
 
-  /// Home Assistant's own weather at home, for the outside temperature while the car is at home.
+  /// Home Assistant's own weather at home, for the outside temperature when the car is at home or its location is unknown.
   static const weather = 'weather.forecast_home';
   static const setTemp = 'sensor.ioniq_6_set_temperature';
   static const defrost = 'binary_sensor.ioniq_6_defrost';
@@ -88,6 +99,12 @@ abstract final class E {
     stationChargeMinutes,
     acLimit,
     dcLimit,
+    energyMonth,
+    costMonth,
+    chargerPower,
+    chargerCharging,
+    chargerSessionCost,
+    chargerVehicle,
     climateSwitch,
     climate,
     weather,

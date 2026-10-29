@@ -86,8 +86,14 @@ class _ChargingScreenState extends State<ChargingScreen> {
                 ),
               ],
             ),
-            if (car.charging && car.chargeKw != null)
-              RollingNumber('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(15)),
+            if ((car.charging || car.homeChargerCharging) && car.chargeRateKw != null)
+              RollingNumber(
+                [
+                  '${car.chargeRateKw!.toStringAsFixed(1)} kW',
+                  if (car.homeChargerCharging && car.sessionKwh != null) '+${car.sessionKwh!.toStringAsFixed(1)} kWh',
+                ].join(' · '),
+                style: Txt.muted(15),
+              ),
             // The track thickens while touched, and each 10% step clicks.
             TweenAnimationBuilder<double>(
               tween: Tween(end: _sliding ? 12 : 6),
@@ -146,6 +152,12 @@ class _ChargingScreenState extends State<ChargingScreen> {
             if (car.stationChargeMinutes != null) Kv('Home charger (L2) to limit', duration(car.stationChargeMinutes!)),
             if (car.fastChargeMinutes != null) Kv('Fast charger to limit', duration(car.fastChargeMinutes!)),
             Kv('DC fast charge limit', '${car.dcLimit}%'),
+            if (car.sessionKwh != null)
+              Kv(
+                car.homeChargerCharging ? 'This session' : 'Last home session',
+                _energyCost(car.sessionKwh!, car.sessionCost),
+              ),
+            if (car.energyMonthKwh != null) Kv('This month', _energyCost(car.energyMonthKwh!, car.costMonth)),
           ],
         ),
         Text('Start, stop and limit changes need a press and hold.', textAlign: TextAlign.center, style: Txt.muted(13)),
@@ -205,3 +217,7 @@ class _HoldBar extends StatelessWidget {
     ),
   );
 }
+
+/// "131.5 kWh · $8.94", from Home Assistant's charging energy and cost.
+String _energyCost(double kwh, double? cost) =>
+    ['${kwh.toStringAsFixed(1)} kWh', if (cost != null) '\$${cost.toStringAsFixed(2)}'].join(' · ');

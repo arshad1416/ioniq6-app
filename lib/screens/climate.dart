@@ -44,13 +44,7 @@ class ClimateScreen extends StatelessWidget {
                   decoration: BoxDecoration(color: const Color(0xFF3A3A3C), borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  [
-                    if (cabin != null) 'Inside ${store.settings.units.temp(cabin)}',
-                    if (car.outsideTempC != null) 'Outside ${store.settings.units.temp(car.outsideTempC)}',
-                  ].join(' · '),
-                  style: Txt.muted(13),
-                ),
+                _Temps(inside: cabin),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -153,6 +147,47 @@ class ClimateScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Inside X · Outside Y". Outside is the weather where the car is; when the car
+/// hasn't shared a location it falls back to Home Assistant's weather, labelled
+/// as home's unless the car is known to be at home.
+class _Temps extends StatefulWidget {
+  const _Temps({required this.inside});
+  final double? inside;
+
+  @override
+  State<_Temps> createState() => _TempsState();
+}
+
+class _TempsState extends State<_Temps> {
+  (double, double)? _asked;
+  double? _atCar;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = AppScope.of(context);
+    final car = store.car;
+    final at = store.isDemo ? null : car.location;
+    if (at != null && at != _asked) {
+      _asked = at;
+      store.weather.tempC(at).then((t) {
+        if (mounted && _asked == at) setState(() => _atCar = t);
+      });
+    }
+    final units = store.settings.units;
+    final home = car.homeWeatherC;
+    return Text(
+      [
+        if (widget.inside != null) 'Inside ${units.temp(widget.inside)}',
+        if (at != null && _atCar != null)
+          'Outside ${units.temp(_atCar)}'
+        else if (home != null)
+          car.atHome || store.isDemo ? 'Outside ${units.temp(home)}' : 'At home ${units.temp(home)}',
+      ].join(' · '),
+      style: Txt.muted(13),
     );
   }
 }

@@ -55,15 +55,30 @@ class CarState {
   int get acLimit => _num(E.acLimit)?.round() ?? 90;
   int get dcLimit => _num(E.dcLimit)?.round() ?? 90;
 
+  /// Whether the home charger's last or current session is this car.
+  bool get onHomeCharger => _str(E.chargerVehicle) == 'ioniq_6';
+  bool get homeChargerCharging => onHomeCharger && _on(E.chargerCharging);
+
+  /// Charging power: the home charger's own meter while it charges this car,
+  /// otherwise what the car reports.
+  double? get chargeRateKw {
+    final w = _num(E.chargerPower);
+    if (homeChargerCharging && w != null && w > 0) return w / 1000;
+    return chargeKw;
+  }
+
+  double? get sessionKwh => onHomeCharger ? (_attrs(E.chargerVehicle)['session_kwh'] as num?)?.toDouble() : null;
+  double? get sessionCost => onHomeCharger ? _num(E.chargerSessionCost) : null;
+  double? get energyMonthKwh => _num(E.energyMonth);
+  double? get costMonth => _num(E.costMonth);
+
   bool get climateOn => _on(E.climateSwitch) || (_str(E.climate) != null && _str(E.climate) != 'off');
   double? get setTempC => _num(E.setTemp);
   double? get cabinTempC => (_attrs(E.climate)['current_temperature'] as num?)?.toDouble();
 
-  /// The car doesn't report outside temperature, so this is Home Assistant's
-  /// weather, shown only while the car is known to be at home where that
-  /// weather applies.
-  double? get outsideTempC =>
-      _str(E.location) == 'home' ? (_attrs(E.weather)['temperature'] as num?)?.toDouble() : null;
+  /// Home Assistant's weather, which is for home, not necessarily where the car is.
+  double? get homeWeatherC => (_attrs(E.weather)['temperature'] as num?)?.toDouble();
+  bool get atHome => _str(E.location) == 'home';
   bool get defrostOn => _on(E.defrost);
   bool get wheelHeatOn => _on(E.wheelHeat);
 

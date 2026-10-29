@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../ha/entities.dart';
 import '../ha/ha_client.dart';
 import 'car_state.dart';
+import 'outside_weather.dart';
 import 'commands.dart';
 import 'demo_data.dart';
 import 'settings.dart';
@@ -25,10 +26,12 @@ class CommandsDisabled implements Exception {
 /// App state: the car as Home Assistant reports it, the connection, and any
 /// command in flight. Screens listen to this and never call HA directly.
 class CarStore extends ChangeNotifier {
-  CarStore(this.settings, {HaClient Function(Uri, String)? clientFactory})
-    : _clientFactory = clientFactory ?? ((url, token) => HaClient(baseUrl: url, token: token));
+  CarStore(this.settings, {HaClient Function(Uri, String)? clientFactory, OutsideWeather? weather})
+    : _clientFactory = clientFactory ?? ((url, token) => HaClient(baseUrl: url, token: token)),
+      weather = weather ?? OutsideWeather();
 
   final Settings settings;
+  final OutsideWeather weather;
   final HaClient Function(Uri, String) _clientFactory;
 
   CarState car = CarState.empty;

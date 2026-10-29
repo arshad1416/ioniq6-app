@@ -52,7 +52,7 @@ class PlatformBridge {
             'soc': car.soc ?? 0,
             'limit': car.acLimit,
             'minutesLeft': car.chargeMinutesLeft ?? 0,
-            'kw': car.chargeKw ?? 0,
+            'kw': car.chargeRateKw ?? 0,
           }
         : null;
     final chargingKey = '$charging';

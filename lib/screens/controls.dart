@@ -21,7 +21,8 @@ int riveLockState(DoorLock s) => switch (s) {
 /// as fractions of the image.
 const _photo = 'assets/images/controls_top.webp';
 const _photoSize = Size(768, 1376);
-const _lockSpot = Offset(.5, .49);
+// Centre of the sunroof glass, which runs from 43% to 55.5% of the photo height.
+const _lockSpot = Offset(.5, .493);
 const _portSpot = Offset(.735, .76);
 const _trunkSpot = Offset(.5, .69);
 

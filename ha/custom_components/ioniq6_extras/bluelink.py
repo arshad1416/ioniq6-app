@@ -64,9 +64,19 @@ class SvmShots:
 class Bluelink:
     """Extra calls for one vehicle, made with kia_uvo's VehicleManager."""
 
-    def __init__(self, vehicle_manager: Any, vehicle_id: str) -> None:
+    def __init__(self, vehicle_manager: Any, vehicle_id: str, pin: str | None = None) -> None:
         self._vm = vehicle_manager
         self._vehicle_id = vehicle_id
+        self._entry_pin = pin
+
+    @property
+    def _pin(self) -> str:
+        """The Bluelink PIN. kia_uvo's token doesn't always carry it (it can be
+        restored without one), so fall back to its manager and config entry."""
+        pin = getattr(self._vm.token, "pin", None) or getattr(self._vm, "pin", None) or self._entry_pin
+        if not pin:
+            raise BluelinkError("No Bluelink PIN; add it in the Hyundai / Kia Connect integration's options")
+        return str(pin)
 
     @property
     def _api(self) -> Any:
@@ -94,7 +104,7 @@ class Bluelink:
     def _pin_token(self, headers: dict[str, str]) -> str:
         """vrfypin: trades the PIN for the pAuth token that commands need."""
         response = self._api.sessions.post(
-            self._api.API_URL + "vrfypin", headers=headers, json={"pin": self._vm.token.pin}
+            self._api.API_URL + "vrfypin", headers=headers, json={"pin": self._pin}
         )
         data = self._check(_json(response))
         pauth = (data.get("result") or {}).get("pAuth")
@@ -151,7 +161,7 @@ class Bluelink:
     def set_valet(self, on: bool) -> None:
         """A car command: only ever called from the valet switch."""
         _, headers = self._post(
-            "valet/activate" if on else "valet/deactivate", pin=True, body={"pin": self._vm.token.pin}
+            "valet/activate" if on else "valet/deactivate", pin=True, body={"pin": self._pin}
         )
         transaction = headers.get("transactionId")
         if transaction:
@@ -179,7 +189,7 @@ class Bluelink:
 
     def set_preconditioning(self, on: bool) -> None:
         """A car command: warms (or stops warming) the battery for fast charging."""
-        _, headers = self._post("evc/prcndtngon" if on else "evc/prcndtngoff", pin=True, body={"pin": self._vm.token.pin})
+        _, headers = self._post("evc/prcndtngon" if on else "evc/prcndtngoff", pin=True, body={"pin": self._pin})
         transaction = headers.get("transactionId")
         if transaction:
             self._wait(transaction)

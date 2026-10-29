@@ -136,3 +136,19 @@ def test_http_error_without_json_is_readable():
     b, _ = make({"valet/lastvaletstatus": FakeResponse(None, status_code=502)})
     with pytest.raises(bluelink.BluelinkError, match="HTTP 502"):
         b.valet_status()
+
+
+def test_pin_falls_back_to_config_entry():
+    b, api = make({"rfc/fndmcrsvm": OK})
+    b._vm.token.pin = None
+    b._entry_pin = "9876"
+    b.request_svm()
+    assert api.calls[0][2] == {"pin": "9876"}
+
+
+def test_no_pin_anywhere_is_readable():
+    b, api = make({})
+    b._vm.token.pin = None
+    with pytest.raises(bluelink.BluelinkError, match="No Bluelink PIN"):
+        b.request_svm()
+    assert api.calls == []

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -32,14 +33,15 @@ class _StatsScreenState extends State<StatsScreen> {
           children: [
             const Lbl('Odometer'),
             const SizedBox(height: 6),
-            Text.rich(
-              TextSpan(
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
                 children: [
-                  TextSpan(text: thousands(car.odometerKm), style: Txt.display(52, weight: 200)),
-                  TextSpan(
-                    text: ' km',
-                    style: Txt.display(22, color: Palette.mute),
-                  ),
+                  RollingNumber(thousands(car.odometerKm), style: Txt.display(52, weight: 200)),
+                  Text(' km', style: Txt.display(22, color: Palette.mute)),
                 ],
               ),
             ),

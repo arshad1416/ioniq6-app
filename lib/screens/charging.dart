@@ -37,7 +37,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
               children: [
                 _Battery(soc),
                 const SizedBox(width: 8),
-                Text('$soc%', style: Txt.display(22, weight: 400, color: Palette.red)),
+                RollingNumber('$soc%', style: Txt.display(22, weight: 400, color: Palette.red)),
                 if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 20),
               ],
             ),
@@ -82,7 +82,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
               ],
             ),
             if (car.charging && car.chargeKw != null)
-              Text('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(13)),
+              RollingNumber('${car.chargeKw!.toStringAsFixed(1)} kW', style: Txt.muted(13)),
             // The track thickens while touched, and each 10% step clicks.
             TweenAnimationBuilder<double>(
               tween: Tween(end: _sliding ? 12 : 6),

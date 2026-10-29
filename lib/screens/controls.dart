@@ -6,18 +6,7 @@ import '../theme.dart';
 import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
-import '../widgets/rive_view.dart';
 import 'valet.dart';
-
-/// Rive `Lock.state`: 0 locked, 1 unlocking, 2 unlocked, 3 error, 4 locking.
-int riveLockState(DoorLock s) => switch (s) {
-  DoorLock.locked => 0,
-  DoorLock.unlocking => 1,
-  DoorLock.unlocked => 2,
-  DoorLock.error => 3,
-  DoorLock.locking => 4,
-  DoorLock.unknown => 0,
-};
 
 /// The overhead photo Arshad picked for this screen, and where things sit on it
 /// as fractions of the image.
@@ -96,19 +85,17 @@ class ControlsScreen extends StatelessWidget {
                 HoldButton(
                   enabled: store.pending == null,
                   onHeld: () => runCommand(context, locked ? const UnlockCommand() : const LockCommand()),
-                  builder: (context, p) => RiveView(
-                    asset: 'assets/rive/ioniq6_lock.riv',
-                    values: {'state': riveLockState(lock), 'holdProgress': p},
-                    fallback: Center(
-                      child: HoldRing(
-                        progress: p,
-                        size: 60,
-                        child: Icon(
-                          locked ? Icons.lock_outline : Icons.lock_open,
-                          size: 30,
-                          color: locked ? Palette.ink : Palette.red,
-                          shadows: const [Shadow(blurRadius: 6)],
-                        ),
+                  // Not ioniq6_lock.riv: that file now draws a whole car, which
+                  // showed up as a car inside the sunroof.
+                  builder: (context, p) => Center(
+                    child: HoldRing(
+                      progress: p,
+                      size: 60,
+                      child: Icon(
+                        locked ? Icons.lock_outline : Icons.lock_open,
+                        size: 30,
+                        color: locked ? Palette.ink : Palette.red,
+                        shadows: const [Shadow(blurRadius: 6)],
                       ),
                     ),
                   ),

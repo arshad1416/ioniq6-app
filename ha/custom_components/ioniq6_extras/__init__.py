@@ -179,8 +179,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         found = {k: type(v).__name__ for k, v in data.items()} if isinstance(data, dict) else type(data).__name__
         raise ConfigEntryNotReady(f"Waiting for the Hyundai / Kia Connect integration (found {found})")
     vehicle_id, vehicle = next(iter(vm.vehicles.items()))
-    pin = next((e.data.get("pin") for e in hass.config_entries.async_entries(KIA_DOMAIN) if e.data.get("pin")), None)
-    extras = Extras(hass, entry, Bluelink(vm, vehicle_id, pin), vehicle)
+
+    def entry_pin() -> str | None:
+        # Read at each use, so a PIN added later via Reconfigure works without a restart.
+        return next((e.data["pin"] for e in hass.config_entries.async_entries(KIA_DOMAIN) if e.data.get("pin")), None)
+
+    extras = Extras(hass, entry, Bluelink(vm, vehicle_id, entry_pin), vehicle)
     await extras.async_config_entry_first_refresh()
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = extras
 

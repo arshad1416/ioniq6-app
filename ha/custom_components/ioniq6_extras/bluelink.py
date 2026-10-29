@@ -17,7 +17,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,16 +64,18 @@ class SvmShots:
 class Bluelink:
     """Extra calls for one vehicle, made with kia_uvo's VehicleManager."""
 
-    def __init__(self, vehicle_manager: Any, vehicle_id: str, pin: str | None = None) -> None:
+    def __init__(
+        self, vehicle_manager: Any, vehicle_id: str, entry_pin: Callable[[], str | None] = lambda: None
+    ) -> None:
         self._vm = vehicle_manager
         self._vehicle_id = vehicle_id
-        self._entry_pin = pin
+        self._entry_pin = entry_pin
 
     @property
     def _pin(self) -> str:
         """The Bluelink PIN. kia_uvo's token doesn't always carry it (it can be
         restored without one), so fall back to its manager and config entry."""
-        pin = getattr(self._vm.token, "pin", None) or getattr(self._vm, "pin", None) or self._entry_pin
+        pin = getattr(self._vm.token, "pin", None) or getattr(self._vm, "pin", None) or self._entry_pin()
         if not pin:
             raise BluelinkError("No Bluelink PIN; add it in the Hyundai / Kia Connect integration's options")
         return str(pin)

@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Build
+import android.os.Bundle
 
 /**
  * Android 16 Live Updates: promoted ongoing notifications that show on the
@@ -84,7 +85,8 @@ class LiveUpdates(private val context: Context) {
             .setColor(RED)
             .apply {
                 if (Build.VERSION.SDK_INT >= 36) {
-                    setRequestPromotedOngoing(true)
+                    // Same as setRequestPromotedOngoing(true), which compileSdk 36 doesn't expose yet.
+                    addExtras(Bundle().apply { putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true) })
                     setShortCriticalText(chip)
                 }
             }
@@ -94,6 +96,7 @@ class LiveUpdates(private val context: Context) {
 
     companion object {
         private const val CHANNEL = "car_live"
+        private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         private const val ID_CHARGING = 61
         private const val ID_CLIMATE = 62
         private val RED = Color.parseColor("#E8333C")

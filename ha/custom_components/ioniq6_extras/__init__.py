@@ -133,22 +133,48 @@ class Extras(DataUpdateCoordinator[Snapshot]):
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
 
+def _is_vehicle_manager(obj: Any) -> bool:
+    return all(hasattr(obj, a) for a in ("api", "token", "vehicles", "get_vehicle"))
+
+
 def _vehicle_manager(hass: HomeAssistant) -> Any | None:
-    """kia_uvo's VehicleManager, wherever this version of it keeps it."""
+    """kia_uvo's VehicleManager, wherever this version of it keeps it: on the
+    config entry's runtime_data or in hass.data, directly or on a coordinator,
+    keyed by entry id or unique id."""
+    holders: list[Any] = []
     for entry in hass.config_entries.async_entries(KIA_DOMAIN):
-        for holder in (getattr(entry, "runtime_data", None), hass.data.get(KIA_DOMAIN, {}).get(entry.entry_id)):
-            vm = getattr(holder, "vehicle_manager", None)
-            if vm is None and isinstance(holder, dict):
-                vm = holder.get("vehicle_manager")
-            if vm is not None and getattr(vm, "vehicles", None):
-                return vm
+        holders.append(getattr(entry, "runtime_data", None))
+    data = hass.data.get(KIA_DOMAIN)
+    if isinstance(data, dict):
+        for value in data.values():
+            holders.append(value)
+            if isinstance(value, dict):
+                holders.extend(value.values())
+    else:
+        holders.append(data)
+    for holder in holders:
+        if holder is None:
+            continue
+        for candidate in (holder, getattr(holder, "vehicle_manager", None), getattr(holder, "_vehicle_manager", None)):
+            if isinstance(holder, dict) and candidate is holder:
+                candidate = holder.get("vehicle_manager")
+            if candidate is not None and _is_vehicle_manager(candidate) and candidate.vehicles:
+                return candidate
+    _LOGGER.debug(
+        "No kia_uvo VehicleManager yet; hass.data[%s] is %s with %s",
+        KIA_DOMAIN,
+        type(data).__name__,
+        {k: type(v).__name__ for k, v in data.items()} if isinstance(data, dict) else None,
+    )
     return None
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     vm = _vehicle_manager(hass)
     if vm is None:
-        raise ConfigEntryNotReady("Waiting for the Hyundai / Kia Connect integration")
+        data = hass.data.get(KIA_DOMAIN)
+        found = {k: type(v).__name__ for k, v in data.items()} if isinstance(data, dict) else type(data).__name__
+        raise ConfigEntryNotReady(f"Waiting for the Hyundai / Kia Connect integration (found {found})")
     vehicle_id, vehicle = next(iter(vm.vehicles.items()))
     extras = Extras(hass, entry, Bluelink(vm, vehicle_id), vehicle)
     await extras.async_config_entry_first_refresh()

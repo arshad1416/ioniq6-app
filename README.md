@@ -48,19 +48,22 @@ Screenshots in `test/screenshots/out/` are refreshed with
 
 The app checks GitHub Releases a few seconds after it opens. When a newer version is out it asks "Download" or "Later" (Later stays quiet for a day for that version), downloads the APK and opens Android's installer. Settings → Check for updates does the same on demand.
 
-To publish a release, push a tag: `git tag v0.2.0 && git push origin v0.2.0`. The Release workflow builds a signed APK named `ioniq6-companion.apk` and attaches it to the release.
-
-Updates only install over a build signed with the same key, so releases need four repository secrets (never commit the keystore):
+To publish a release from the Mac (no Actions minutes), commit and push, then:
 
 ```sh
-keytool -genkeypair -v -keystore ~/ioniq6-release.jks -alias ioniq6 -keyalg RSA -keysize 4096 -validity 10000
-base64 -i ~/ioniq6-release.jks | gh secret set KEYSTORE_BASE64
+tool/release.sh 0.2.0 "What changed"
+```
+
+It builds the APK signed with the release key, checks the signature, and creates release `v0.2.0` with `ioniq6-companion.apk` attached. The versionCode comes from the version (`major*10000 + minor*100 + patch`, so 0.2.0 is 200). Versions must only go up. The Release workflow does the same on GitHub when run by hand (Actions → Release → Run workflow).
+
+Updates only install over a build signed with the same key. The key lives outside the repo at `~/.android/ioniq6-release.jks`, and its passwords are in `android/key.properties`, which git ignores. Keep a copy of both in Bitwarden: if the key is lost, every phone has to uninstall before it can take a new build. To let the workflow sign too, add the same values as repository secrets:
+
+```sh
+base64 -i ~/.android/ioniq6-release.jks | gh secret set KEYSTORE_BASE64
 gh secret set KEYSTORE_PASSWORD
 gh secret set KEY_ALIAS --body ioniq6
 gh secret set KEY_PASSWORD
 ```
-
-For local signed builds, put the same values in `android/key.properties` (ignored by git) with `KEYSTORE_PATH=/path/to/ioniq6-release.jks`.
 
 ## How it talks to Home Assistant
 

@@ -54,7 +54,7 @@ void main() {
     }
   });
 
-  for (final route in ['/controls', '/climate', '/charging', '/settings']) {
+  for (final route in ['/controls', '/climate', '/charging', '/settings', '/camera']) {
     testWidgets('$route lays out without errors', (tester) async {
       await pumpApp(tester);
       tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);

@@ -35,7 +35,17 @@ String _materialIcons() {
 void main() {
   setUpAll(loadFonts);
 
-  for (final route in ['/', '/controls', '/climate', '/charging', '/stats', '/health', '/activity', '/settings']) {
+  for (final route in [
+    '/',
+    '/controls',
+    '/climate',
+    '/charging',
+    '/stats',
+    '/health',
+    '/activity',
+    '/settings',
+    '/camera',
+  ]) {
     testWidgets('screenshot $route', (tester) async {
       RiveView.enabled = false;
       tester.view.physicalSize = const Size(1236, 2745); // OnePlus 13 at 3x

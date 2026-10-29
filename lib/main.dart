@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'car/car_store.dart';
 import 'car/settings.dart';
 import 'platform/bridge.dart';
+import 'screens/camera.dart';
 import 'screens/charging.dart';
 import 'screens/climate.dart';
 import 'screens/controls.dart';
@@ -63,5 +64,6 @@ class CompanionApp extends StatelessWidget {
     '/health': (_) => const HealthScreen(),
     '/activity': (_) => const ActivityScreen(),
     '/settings': (_) => const SettingsScreen(),
+    '/camera': (_) => const CameraScreen(),
   };
 }

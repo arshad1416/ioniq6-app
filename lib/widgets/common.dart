@@ -20,9 +20,13 @@ class SubScreen extends StatelessWidget {
     this.scroll = true,
     this.trailing,
     this.background,
+    this.back = 'IONIQ 6',
   });
 
   final String title;
+
+  /// The screen the back link returns to.
+  final String back;
   final List<Widget> children;
   final bool scroll;
   final Widget? trailing;
@@ -46,10 +50,11 @@ class SubScreen extends StatelessWidget {
                     child: TextButton(
                       onPressed: () => Navigator.of(context).maybePop(),
                       style: TextButton.styleFrom(foregroundColor: Palette.mute),
-                      child: Text('‹ IONIQ 6', style: Txt.body(16, color: Palette.mute)),
+                      child: Text('‹ $back', style: Txt.body(16, color: Palette.mute)),
                     ),
                   ),
-                  Text(title, style: Txt.display(22, weight: 400)),
+                  // Never in the way of a tap on the back link.
+                  IgnorePointer(child: Text(title, style: Txt.display(22, weight: 400))),
                   if (trailing != null) Align(alignment: Alignment.centerRight, child: trailing),
                 ],
               ),
@@ -187,6 +192,72 @@ class NavRow extends StatelessWidget {
           ],
         ],
       ),
+    ),
+  );
+}
+
+/// The mockup's outlined full-width button with an icon (Defrost car, Take new
+/// snapshot); red when [on].
+class WideButton extends StatelessWidget {
+  const WideButton({super.key, required this.icon, required this.label, this.on = false, required this.onTap});
+  final Widget Function(Color color) icon;
+  final String label;
+  final bool on;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        border: Border.all(color: on ? Palette.red : const Color(0xFF3A3A3C)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          icon(on ? Palette.red : Palette.light),
+          const SizedBox(width: 14),
+          Flexible(child: Text(label, style: Txt.body(16), overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    ),
+  );
+}
+
+/// A row with a switch on the right, laid out like [NavRow].
+class SwitchRow extends StatelessWidget {
+  const SwitchRow({super.key, this.glyph, required this.label, this.sub, required this.value, this.onChanged});
+  final Widget? glyph;
+  final String label;
+  final String? sub;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+    child: Row(
+      children: [
+        if (glyph != null) ...[
+          IconTheme(
+            data: const IconThemeData(size: 20, color: Palette.mute),
+            child: glyph!,
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Txt.body(16)),
+              if (sub != null) Text(sub!, style: Txt.muted(14)),
+            ],
+          ),
+        ),
+        Switch(value: value, onChanged: onChanged),
+      ],
     ),
   );
 }

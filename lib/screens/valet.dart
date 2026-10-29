@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../car/settings.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/line_icon.dart';
 
 void valetComingSoon(BuildContext context) => ScaffoldMessenger.of(context)
   ..hideCurrentSnackBar()
@@ -10,75 +12,109 @@ void valetComingSoon(BuildContext context) => ScaffoldMessenger.of(context)
   );
 
 /// Valet settings: speed limit, valet PIN and what's hidden from the valet.
-/// These are saved in the car through Bluelink, which Home Assistant can't
-/// reach yet, so everything here is shown but locked.
-class ValetScreen extends StatelessWidget {
+/// They're kept on the phone for now; the car only gets them once Home
+/// Assistant can reach Bluelink's valet settings.
+class ValetScreen extends StatefulWidget {
   const ValetScreen({super.key});
+
+  @override
+  State<ValetScreen> createState() => _ValetScreenState();
+}
+
+class _ValetScreenState extends State<ValetScreen> {
+  Future<void> _update(ValetPrefs Function(ValetPrefs v) change) async {
+    final settings = AppScope.of(context).settings;
+    setState(() => settings.valet = change(settings.valet));
+    await settings.save();
+  }
 
   @override
   Widget build(BuildContext context) {
     final v = AppScope.of(context).settings.valet;
-    Widget locked(String title, bool value) => Opacity(
-      opacity: .5,
-      child: SwitchListTile(
-        title: Text(title, style: Txt.body(16)),
-        value: value,
-        onChanged: null,
-      ),
-    );
     return SubScreen(
       title: 'Valet mode',
+      back: 'Controls',
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Palette.redDeep, borderRadius: BorderRadius.circular(14)),
-          child: Text(
-            'These settings are saved in the car through Bluelink. Home Assistant can\'t do that yet, so they\'re locked for now.',
-            style: Txt.body(15),
-          ),
-        ),
         Panel(
           children: [
             Row(
               children: [
-                Expanded(child: Text('Speed limit', style: Txt.body(16, weight: 500))),
-                Text('${v.speedLimitKmh} km/h', style: Txt.body(16, weight: 500, color: Palette.red)),
+                Expanded(child: Text('Speed limit', style: Txt.body(16, weight: 600))),
+                Text('${v.speedLimitKmh} km/h', style: Txt.body(16, weight: 600)),
               ],
             ),
-            Slider(
-              value: v.speedLimitKmh.toDouble(),
-              min: 40,
-              max: 120,
-              divisions: 8,
-              label: '${v.speedLimitKmh} km/h',
-              onChanged: null,
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(overlayShape: SliderComponentShape.noOverlay),
+              child: Slider(
+                value: v.speedLimitKmh.toDouble(),
+                min: 40,
+                max: 120,
+                divisions: 8,
+                onChanged: (x) => _update((v) => v.copyWith(speedLimitKmh: x.round())),
+              ),
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('40', style: Txt.muted(13)),
-                Text('120 km/h', style: Txt.muted(13)),
+                Text('40 km/h', style: Txt.muted(15)),
+                Text('120 km/h', style: Txt.muted(15)),
+              ],
+            ),
+            Text('The car warns the valet and logs it if they go over.', style: Txt.muted(13)),
+          ],
+        ),
+        Panel(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Valet PIN', style: Txt.body(16, weight: 600)),
+                const SizedBox(width: 16),
+                Expanded(child: Text('Needed to turn valet mode off', style: Txt.muted(15))),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 0; i < 4; i++)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: v.pinSet ? Palette.red : Palette.unlit),
+                  ),
               ],
             ),
           ],
         ),
         RowsCard(
           children: [
-            NavRow(icon: Icons.pin_outlined, label: 'Valet PIN', value: v.pinSet ? '● ● ● ●' : 'Not set'),
             NavRow(
-              icon: Icons.password,
+              glyph: const LineIcon(Glyphs.lock),
               label: 'Change valet PIN',
-              sub: 'Old PIN, then the new one twice',
-              value: 'Coming soon',
               onTap: () => valetComingSoon(context),
+            ),
+            SwitchRow(
+              glyph: const LineIcon(Glyphs.lines),
+              label: 'Hide navigation history',
+              sub: 'Recent places and saved addresses',
+              value: v.hideNavigation,
+              onChanged: (on) => _update((v) => v.copyWith(hideNavigation: on)),
+            ),
+            SwitchRow(
+              glyph: const LineIcon(Glyphs.mail),
+              label: 'Hide phone and messages',
+              sub: 'Contacts, calls, texts on the screen',
+              value: v.hidePhone,
+              onChanged: (on) => _update((v) => v.copyWith(hidePhone: on)),
             ),
           ],
         ),
-        RowsCard(
-          children: [
-            locked('Hide navigation history', v.hideNavigation),
-            locked('Hide phone and messages', v.hidePhone),
-          ],
+        Text(
+          'Saved on this phone for now. Sending these to the car needs Bluelink\'s valet settings in Home Assistant, '
+          'and will then ask for a hold and your PIN.',
+          style: Txt.muted(13),
+          textAlign: TextAlign.center,
         ),
       ],
     );

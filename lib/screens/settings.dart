@@ -8,6 +8,7 @@ import '../security/biometrics.dart';
 import '../theme.dart';
 import '../update/update_prompt.dart';
 import '../widgets/common.dart';
+import '../widgets/line_icon.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -99,8 +100,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SnackBar(content: Text('$what needs Bluelink features Home Assistant doesn\'t have yet. It\'s coming.')),
     );
 
-  Widget _soonRow(IconData icon, String label, {String? sub}) =>
-      NavRow(icon: icon, label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
+  Widget _soonRow(LineGlyph glyph, String label, {String? sub}) =>
+      NavRow(glyph: LineIcon(glyph), label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
 
   Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
     title: Text(title, style: Txt.body(16)),
@@ -109,30 +110,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     onChanged: onChanged,
   );
 
-  Widget _choice<T>(IconData icon, String label, T value, List<(T, String)> options, ValueChanged<T> onChanged) =>
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
+  Future<void> _choose<T>(String title, T value, List<(T, String)> options, ValueChanged<T> onChanged) async {
+    final picked = await showModalBottomSheet<T>(
+      context: context,
+      backgroundColor: Palette.raise,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: Palette.mute),
-            const SizedBox(width: 12),
-            Expanded(child: Text(label, style: Txt.body(16))),
-            SegmentedButton<T>(
-              showSelectedIcon: false,
-              segments: [for (final (v, l) in options) ButtonSegment(value: v, label: Text(l))],
-              selected: {value},
-              onSelectionChanged: (v) => onChanged(v.first),
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: Palette.redDeep,
-                selectedForegroundColor: Palette.ink,
-                foregroundColor: Palette.mute,
-                side: const BorderSide(color: Palette.line),
-                visualDensity: VisualDensity.compact,
-              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(title, style: Txt.display(22, weight: 400)),
             ),
+            for (final (v, label) in options)
+              ListTile(
+                title: Text(label, style: Txt.body(16)),
+                trailing: v == value ? const Icon(Icons.check, color: Palette.red) : null,
+                onTap: () => Navigator.pop(context, v),
+              ),
           ],
         ),
-      );
+      ),
+    );
+    if (picked != null && picked != value) onChanged(picked);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,12 +146,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Lbl('Car'),
         RowsCard(
           children: [
-            _soonRow(Icons.people_outline, 'Driver profiles', sub: 'Seat, mirror and climate per driver'),
-            _soonRow(Icons.key_outlined, 'Digital Key', sub: 'Unlock and start with your phone'),
+            _soonRow(Glyphs.person, 'Driver profiles', sub: 'Seat, mirrors and climate per driver'),
+            _soonRow(Glyphs.key, 'Digital Key', sub: 'Phone and card keys for this car'),
             NavRow(
-              icon: Icons.directions_walk,
+              glyph: const LineIcon(Glyphs.walk),
               label: 'Walk-away lock',
-              sub: 'Runs in Home Assistant, 45 s after you leave',
+              sub: '45 s after your phone leaves the car',
               value: car.walkAwayDryRun ? 'Test only' : 'On',
             ),
             NavRow(
@@ -159,8 +160,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               sub: 'OnePlus 13 Bluetooth to IONIQ 6',
               value: car.phoneConnected ? 'Connected' : 'Not connected',
             ),
-            _soonRow(Icons.schedule, 'Off-peak charging', sub: 'Charge when power is cheapest'),
-            const NavRow(icon: Icons.palette_outlined, label: 'Car colour', value: 'Ultimate Red'),
+            _soonRow(Glyphs.bolt, 'Off-peak charging', sub: 'Ontario ULO window, 23:00–07:00'),
+            const NavRow(glyph: LineIcon(Glyphs.brush), label: 'Car colour', value: 'Ultimate Red'),
             _switch(
               'Car commands',
               s.commandsEnabled ? 'On: holding a control acts on the car' : 'Off: the app is read-only',
@@ -172,22 +173,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Lbl('App'),
         RowsCard(
           children: [
-            _choice(Icons.speed, 'Distance & speed', s.miles, const [(false, 'km'), (true, 'mi')], (v) {
-              _save((s) => s.miles = v);
-              store.refreshViews();
-            }),
-            _choice(Icons.thermostat, 'Temperature', s.fahrenheit, const [(false, '°C'), (true, '°F')], (v) {
-              _save((s) => s.fahrenheit = v);
-              store.refreshViews();
-            }),
             NavRow(
-              icon: Icons.language,
+              glyph: const LineIcon(Glyphs.ruler),
+              label: 'Distance & speed',
+              value: s.miles ? 'mi · mph' : 'km · km/h',
+              onTap: () => _choose('Distance & speed', s.miles, const [(false, 'km · km/h'), (true, 'mi · mph')], (v) {
+                _save((s) => s.miles = v);
+                store.refreshViews();
+              }),
+            ),
+            NavRow(
+              glyph: const LineIcon(Glyphs.thermometer),
+              label: 'Temperature',
+              value: s.fahrenheit ? '°F' : '°C',
+              onTap: () => _choose('Temperature', s.fahrenheit, const [(false, '°C'), (true, '°F')], (v) {
+                _save((s) => s.fahrenheit = v);
+                store.refreshViews();
+              }),
+            ),
+            NavRow(
+              glyph: const LineIcon(Glyphs.globe),
               label: 'Language',
               sub: 'Français is coming',
-              value: 'English',
+              value: 'English (Canada)',
               onTap: () => _soon('Français'),
             ),
-            _soonRow(Icons.event_outlined, 'Calendar sync', sub: 'Warm or cool the car before trips'),
+            _soonRow(Glyphs.calendar, 'Calendar sync', sub: 'Plans trips and climate from events'),
             _switch(
               'Live Updates',
               'Charging and climate on the lock screen',
@@ -259,38 +270,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
               (v) => _save((s) => s.keepLoggedIn = v),
             ),
             _switch(
-              'Use biometrics at log in',
-              'Fingerprint or face when the app opens',
+              'Use biometrics to log in',
+              'Fingerprint or face',
               s.biometricLogin,
               (v) => _setBiometric(v, (s, v) => s.biometricLogin = v),
             ),
             _switch(
-              'Use biometrics for PIN verification',
-              'Fingerprint or face before a car command is sent',
+              'Use biometrics for PIN',
+              'Fingerprint or face before a car command',
               s.biometricCommands,
               (v) => _setBiometric(v, (s, v) => s.biometricCommands = v),
             ),
-            _soonRow(Icons.pin_outlined, 'Change PIN', sub: 'Your Bluelink PIN'),
-            _soonRow(Icons.password, 'Change password', sub: 'Your Bluelink account'),
-            _soonRow(Icons.devices_other, 'Registered devices', sub: 'Phones signed in to Bluelink'),
+            _soonRow(Glyphs.lock, 'Change PIN', sub: 'Your Bluelink PIN'),
+            _soonRow(Glyphs.password, 'Change password', sub: 'Your Bluelink account'),
+            _soonRow(Glyphs.phone, 'Registered devices', sub: 'Phones signed in to this account'),
           ],
         ),
         const Lbl('Help'),
         RowsCard(
           children: [
             NavRow(
-              icon: Icons.help_outline,
+              glyph: const LineIcon(Glyphs.help),
               label: 'Help & support',
-              sub: 'Hyundai Canada owners',
+              sub: 'Guides, contact Hyundai',
               onTap: () => launchUrl(
                 Uri.parse('https://www.hyundaicanada.com/en/owners-section'),
                 mode: LaunchMode.externalApplication,
               ),
             ),
             NavRow(
-              icon: Icons.emergency_outlined,
+              glyph: const LineIcon(Glyphs.warning),
               label: 'Emergency services',
-              sub: '911, roadside assistance, share location',
+              sub: 'Roadside, collision, 911',
               onTap: () => Navigator.pushNamed(context, '/emergency'),
             ),
           ],

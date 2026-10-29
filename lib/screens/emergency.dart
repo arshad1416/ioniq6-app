@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/line_icon.dart';
 
 /// Hyundai Canada roadside assistance, open 24/7.
 const roadsideNumber = '1-800-268-9958';
@@ -19,36 +20,38 @@ class EmergencyScreen extends StatelessWidget {
     final loc = car.location;
     return SubScreen(
       title: 'Emergency',
+      back: 'Settings',
       children: [
         // Opens the phone's dialer with 911 filled in; the call is placed there.
-        FilledButton.icon(
+        FilledButton(
           onPressed: () => _dial('911'),
-          icon: const Icon(Icons.call),
-          label: const Text('Call 911'),
           style: FilledButton.styleFrom(
             backgroundColor: Palette.red,
+            foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             textStyle: Txt.body(19, weight: 600),
           ),
+          child: const Text('Call 911'),
         ),
         RowsCard(
           children: [
             NavRow(
-              icon: Icons.car_repair,
+              glyph: const LineIcon(Glyphs.tow),
               label: 'Roadside assistance',
-              sub: 'Hyundai Canada, 24/7: $roadsideNumber',
+              sub: 'Tow, flat tire, battery, lockout · $roadsideNumber',
               onTap: () => _dial(roadsideNumber),
             ),
             NavRow(
-              icon: Icons.car_crash_outlined,
+              glyph: const LineIcon(Glyphs.warning),
               label: 'Report a collision',
-              sub: 'Needs Bluelink features Home Assistant doesn\'t have yet',
+              sub: 'Photos, location, other driver',
               value: 'Coming soon',
             ),
             NavRow(
-              icon: Icons.share_location,
+              glyph: const LineIcon(Glyphs.pinFilled),
               label: 'Share car location',
-              sub: loc == null ? 'The car isn\'t sharing its location right now' : 'Send a map link',
+              sub: loc == null ? 'The car isn\'t sharing its location right now' : 'Send where the car is to a contact',
               onTap: loc == null
                   ? null
                   : () => SharePlus.instance.share(
@@ -61,7 +64,8 @@ class EmergencyScreen extends StatelessWidget {
           ],
         ),
         Text(
-          'Call 911 and Roadside open your phone\'s dialer. Nothing is called until you press call there.',
+          'The car\'s own SOS button connects to Bluelink\'s emergency line. Call 911 and Roadside open your '
+          'phone\'s dialer; nothing is called until you press call there.',
           style: Txt.muted(13),
           textAlign: TextAlign.center,
         ),

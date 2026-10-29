@@ -25,6 +25,9 @@ abstract final class E {
 
   static const climateSwitch = 'switch.ioniq_6_climate';
   static const climate = 'climate.ioniq_6_climate_control';
+
+  /// Home Assistant's own weather at home, for the outside temperature.
+  static const weather = 'weather.forecast_home';
   static const setTemp = 'sensor.ioniq_6_set_temperature';
   static const defrost = 'binary_sensor.ioniq_6_defrost';
   static const wheelHeat = 'binary_sensor.ioniq_6_steering_wheel_heater';
@@ -87,6 +90,7 @@ abstract final class E {
     dcLimit,
     climateSwitch,
     climate,
+    weather,
     setTemp,
     defrost,
     wheelHeat,

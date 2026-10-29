@@ -34,6 +34,7 @@ Map<String, EntityState> demoStates() {
       s(E.dcLimit, '90'),
       s(E.climateSwitch, 'off'),
       s(E.climate, 'off', {'current_temperature': 14, 'temperature': 21}),
+      s(E.weather, 'cloudy', {'temperature': 3}),
       s(E.setTemp, '21.0'),
       s(E.defrost, 'off'),
       s(E.wheelHeat, 'off'),

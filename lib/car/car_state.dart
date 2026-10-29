@@ -58,6 +58,7 @@ class CarState {
   bool get climateOn => _on(E.climateSwitch) || (_str(E.climate) != null && _str(E.climate) != 'off');
   double? get setTempC => _num(E.setTemp);
   double? get cabinTempC => (_attrs(E.climate)['current_temperature'] as num?)?.toDouble();
+  double? get outsideTempC => (_attrs(E.weather)['temperature'] as num?)?.toDouble();
   bool get defrostOn => _on(E.defrost);
   bool get wheelHeatOn => _on(E.wheelHeat);
 

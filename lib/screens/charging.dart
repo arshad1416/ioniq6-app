@@ -9,6 +9,7 @@ import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/dock.dart';
 import '../widgets/hold_button.dart';
+import '../widgets/line_icon.dart';
 
 class ChargingScreen extends StatefulWidget {
   const ChargingScreen({super.key});
@@ -65,10 +66,10 @@ class _ChargingScreenState extends State<ChargingScreen> {
         ),
         const Row(
           children: [
-            DockItem(icon: Icons.lock_outline, label: 'Lock', route: '/controls'),
+            DockItem(glyph: LineIcon(Glyphs.lock), label: 'Lock', route: '/controls'),
             DockItem(glyph: ClimateIcon(), label: 'Climate', route: '/climate'),
-            DockItem(icon: Icons.bolt, label: 'Charge', on: true),
-            DockItem(icon: Icons.directions_car_outlined, label: 'Controls', route: '/controls'),
+            DockItem(glyph: LineIcon(Glyphs.bolt), label: 'Charge', on: true),
+            DockItem(glyph: LineIcon(Glyphs.car), label: 'Controls', route: '/controls'),
           ],
         ),
         Panel(

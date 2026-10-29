@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/line_icon.dart';
+import '../widgets/top_car.dart';
 
 enum CameraView { front, rear, left, right, surround }
 
-/// 360° camera shots. No camera source reaches Home Assistant yet, so this
-/// shows an empty viewer and keeps "Take new snapshot" off until one does.
+/// 360° camera shots, laid out as in the mockup. No camera source reaches Home
+/// Assistant yet, so the viewer is empty and "Take new snapshot" (which would
+/// wake the car) stays off.
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
 
@@ -16,105 +19,84 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  static const _tabs = ['Latest', 'Parked', 'Walk-away'];
-  int _tab = 0;
-  CameraView _view = CameraView.surround;
+  static const _sets = ['Latest', 'Parked', 'Walk-away'];
+  int _set = 0;
+  CameraView _view = CameraView.front;
 
   @override
   Widget build(BuildContext context) => SubScreen(
     title: '360 Camera',
     children: [
-      Container(
-        padding: const EdgeInsets.all(3),
-        decoration: BoxDecoration(color: Palette.raise, borderRadius: BorderRadius.circular(12)),
+      Row(
+        children: [
+          for (var i = 0; i < _sets.length; i++) ...[
+            if (i > 0) const SizedBox(width: 6),
+            Expanded(
+              child: _Pill(_sets[i], on: i == _set, onTap: () => setState(() => _set = i)),
+            ),
+          ],
+        ],
+      ),
+      _Viewer(view: _view),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 4, 14),
         child: Row(
           children: [
-            for (var i = 0; i < _tabs.length; i++)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tab = i),
-                  child: AnimatedContainer(
-                    duration: Motion.base,
-                    curve: Motion.enter,
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      color: i == _tab ? Palette.unlit : Colors.transparent,
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Text(
-                      _tabs[i],
-                      textAlign: TextAlign.center,
-                      style: Txt.body(15, weight: 500, color: i == _tab ? Palette.ink : Palette.mute),
-                    ),
-                  ),
-                ),
+            SizedBox(
+              width: 110,
+              child: Center(
+                child: _CarCams(view: _view, onPick: (v) => setState(() => _view = v)),
               ),
+            ),
+            const SizedBox(width: 22),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final pair in const [
+                    [CameraView.front, CameraView.rear],
+                    [CameraView.left, CameraView.right],
+                  ]) ...[
+                    Row(
+                      children: [
+                        for (final v in pair) ...[
+                          if (v != pair.first) const SizedBox(width: 6),
+                          Expanded(
+                            child: _Pill(_label(v), on: v == _view, onTap: () => setState(() => _view = v)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  _Pill(
+                    'Surround (top view)',
+                    on: _view == CameraView.surround,
+                    onTap: () => setState(() => _view = CameraView.surround),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      AspectRatio(
-        aspectRatio: 16 / 10,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(color: Color(0xFF0E0E10)),
-            child: Stack(
-              children: [
-                const Positioned.fill(child: CustomPaint(painter: _GuidePainter())),
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.photo_camera_outlined, color: Palette.mute, size: 30),
-                      const SizedBox(height: 8),
-                      Text('No ${_tabs[_tab].toLowerCase()} shots yet', style: Txt.body(16)),
-                      const SizedBox(height: 4),
-                      Text('${_label(_view)} view', style: Txt.muted(14)),
-                    ],
-                  ),
-                ),
-              ],
+      Opacity(
+        opacity: .5,
+        child: WideButton(
+          icon: (color) => LineIcon(Glyphs.camera, color: color, size: 22),
+          label: 'Take new snapshot',
+          onTap: () => ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('New shots wake the car through Bluelink, so this stays off until you turn it on.'),
+              ),
             ),
-          ),
-        ),
-      ),
-      Row(
-        children: [
-          SizedBox(width: 92, height: 150, child: _CarCams(view: _view)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final v in CameraView.values)
-                  ChoiceChip(
-                    label: Text(_label(v)),
-                    selected: v == _view,
-                    showCheckmark: false,
-                    onSelected: (_) => setState(() => _view = v),
-                    selectedColor: Palette.redDeep,
-                    backgroundColor: Palette.raise,
-                    side: BorderSide(color: v == _view ? Palette.red : Palette.line),
-                    labelStyle: Txt.body(15, color: v == _view ? Palette.ink : Palette.light),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 4),
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: null,
-          icon: const Icon(Icons.camera_alt_outlined),
-          label: const Text('Take new snapshot'),
-          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
         ),
       ),
       Text(
-        'Snapshots need a camera source in Home Assistant. This turns on once one is connected.',
+        'Shots will come from Bluelink\'s Find My Car 360 view, the last one stored (read only), once Home Assistant '
+        'can fetch them.',
         style: Txt.muted(13),
         textAlign: TextAlign.center,
       ),
@@ -130,67 +112,145 @@ class _CameraScreenState extends State<CameraScreen> {
   };
 }
 
-/// The car from above with a dot at each camera; the selected ones light red.
-class _CarCams extends StatelessWidget {
-  const _CarCams({required this.view});
+class _Pill extends StatelessWidget {
+  const _Pill(this.label, {required this.on, required this.onTap});
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: Motion.base,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(color: on ? Palette.redDeep : Palette.raise, borderRadius: BorderRadius.circular(14)),
+      child: Text(
+        label,
+        textAlign: TextAlign.center,
+        style: Txt.body(14, color: on ? Palette.red : Palette.mute),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    ),
+  );
+}
+
+/// The 16:10 viewer: a dark frame with parking guide lines, or the car from
+/// above for the surround view. Empty until shots can be fetched.
+class _Viewer extends StatelessWidget {
+  const _Viewer({required this.view});
   final CameraView view;
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: 16 / 10,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, .2),
+            radius: 1.1,
+            colors: [Color(0xFF26282C), Color(0xFF0E0F11), Colors.black],
+            stops: [0, .7, 1],
+          ),
+        ),
+        child: Stack(
+          children: [
+            if (view == CameraView.surround)
+              const Positioned.fill(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Image(image: AssetImage(TopCar.asset), fit: BoxFit.contain),
+                ),
+              )
+            else
+              const Positioned.fill(child: CustomPaint(painter: _GuidePainter())),
+            Positioned(
+              left: 12,
+              top: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(999)),
+                child: Text(_CameraScreenState._label(view), style: Txt.body(14, weight: 600)),
+              ),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 10,
+              child: Text('No shots yet', style: Txt.mono(12, weight: 400, color: const Color(0xFFCFCFD2))),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// The car from above with a dot at each camera; tap one to pick it.
+class _CarCams extends StatelessWidget {
+  const _CarCams({required this.view, required this.onPick});
+  final CameraView view;
+  final ValueChanged<CameraView> onPick;
+
+  static const _height = 220.0;
 
   @override
   Widget build(BuildContext context) {
     bool on(CameraView v) => view == v || view == CameraView.surround;
-    Widget dot(Alignment a, CameraView v) => Align(
-      alignment: a,
-      child: AnimatedContainer(
-        duration: Motion.base,
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: on(v) ? Palette.red : Palette.unlit,
-          border: Border.all(color: Palette.stage, width: 2),
-          boxShadow: on(v) ? [BoxShadow(color: Palette.red.withValues(alpha: .6), blurRadius: 6)] : null,
+    CarSpot dot(Offset at, CameraView v) => CarSpot(
+      at,
+      const Size.square(32),
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => onPick(v),
+        child: Center(
+          child: AnimatedContainer(
+            duration: Motion.base,
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: on(v) ? Palette.red : Palette.unlit,
+              border: Border.all(color: Palette.stage, width: 2),
+              boxShadow: on(v) ? [BoxShadow(color: Palette.red.withValues(alpha: .7), blurRadius: 8)] : null,
+            ),
+          ),
         ),
       ),
     );
-    return Stack(
-      children: [
-        Center(
-          child: RotatedBox(quarterTurns: 1, child: Image.asset('assets/images/top.webp', fit: BoxFit.contain)),
-        ),
-        dot(const Alignment(0, -.92), CameraView.front),
-        dot(const Alignment(0, .92), CameraView.rear),
-        dot(const Alignment(-.62, -.2), CameraView.left),
-        dot(const Alignment(.62, -.2), CameraView.right),
+    return TopCar(
+      height: _height,
+      spots: [
+        dot(const Offset(.467, -.04), CameraView.front),
+        dot(const Offset(.467, 1.04), CameraView.rear),
+        dot(const Offset(-.14, .42), CameraView.left),
+        dot(const Offset(1.08, .42), CameraView.right),
       ],
     );
   }
 }
 
-/// Parking guide lines: two converging side lines with distance ticks.
+/// The mockup's guide: amber side lines converging, with two red distance bars,
+/// drawn in a 160×100 box stretched to the viewer.
 class _GuidePainter extends CustomPainter {
   const _GuidePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    final colors = [const Color(0xFFE8333C), const Color(0xFFFFB02E), const Color(0xFF7FD67A)];
-    for (var i = 0; i < 3; i++) {
-      final paint = Paint()
-        ..color = colors[i].withValues(alpha: .45)
-        ..strokeWidth = 2
-        ..style = PaintingStyle.stroke;
-      final y0 = h * (1 - i * .22), y1 = h * (1 - (i + 1) * .22);
-      double x(double y, bool left) {
-        final t = (h - y) / h; // 0 at bottom, 1 at top
-        final inset = w * (.12 + .2 * t);
-        return left ? inset : w - inset;
-      }
-
-      for (final left in [true, false]) {
-        canvas.drawLine(Offset(x(y0, left), y0), Offset(x(y1, left), y1), paint);
-        canvas.drawLine(Offset(x(y1, left), y1), Offset(x(y1, left) + (left ? 14 : -14), y1), paint);
-      }
-    }
+    canvas.scale(size.width / 160, size.height / 100);
+    Paint pen(Color c) => Paint()
+      ..color = c
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final amber = pen(const Color(0x99FFB02E)), red = pen(const Color(0x8CE8333C));
+    canvas
+      ..drawLine(const Offset(40, 100), const Offset(58, 52), amber)
+      ..drawLine(const Offset(120, 100), const Offset(102, 52), amber)
+      ..drawLine(const Offset(47, 82), const Offset(113, 82), red)
+      ..drawLine(const Offset(53, 66), const Offset(107, 66), red);
   }
 
   @override

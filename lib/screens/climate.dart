@@ -5,6 +5,7 @@ import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
+import '../widgets/line_icon.dart';
 import '../widgets/top_car.dart';
 
 class ClimateScreen extends StatelessWidget {
@@ -44,7 +45,10 @@ class ClimateScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  cabin == null ? 'Cabin temperature not reported' : 'Inside ${store.settings.units.temp(cabin)}',
+                  [
+                    if (cabin != null) 'Inside ${store.settings.units.temp(cabin)}',
+                    if (car.outsideTempC != null) 'Outside ${store.settings.units.temp(car.outsideTempC)}',
+                  ].join(' · '),
                   style: Txt.muted(13),
                 ),
                 const SizedBox(height: 12),
@@ -60,7 +64,12 @@ class ClimateScreen extends StatelessWidget {
                             HoldRing(
                               progress: p,
                               size: 40,
-                              child: Icon(Icons.power_settings_new, size: 28, color: on ? Palette.red : Palette.light),
+                              child: LineIcon(
+                                Glyphs.power,
+                                size: 28,
+                                stroke: 1.8,
+                                color: on ? Palette.red : Palette.light,
+                              ),
                             ),
                             Text(
                               store.pending is StartClimateCommand || store.pending is StopClimateCommand
@@ -110,7 +119,12 @@ class ClimateScreen extends StatelessWidget {
                         onTap: () => store.updateClimate(req.copyWith(wheel: !req.wheel)),
                         child: Column(
                           children: [
-                            Icon(Icons.trip_origin, size: 28, color: req.wheel ? Palette.red : Palette.light),
+                            LineIcon(
+                              Glyphs.wheel,
+                              size: 28,
+                              stroke: 1.8,
+                              color: req.wheel ? Palette.red : Palette.light,
+                            ),
                             const SizedBox(height: 6),
                             Text('Wheel', style: Txt.muted(13)),
                           ],
@@ -120,7 +134,7 @@ class ClimateScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                _Wide(
+                WideButton(
                   icon: (color) => CustomPaint(size: const Size.square(26), painter: _DefrostIcon(color)),
                   label: 'Defrost car',
                   on: req.defrost,
@@ -130,7 +144,7 @@ class ClimateScreen extends StatelessWidget {
                 Text(
                   on
                       ? 'Hold the power button to stop.'
-                      : 'Hold the power button to start. Runs ${req.minutes} min with these settings.',
+                      : 'Hold the power button to start. Runs ${req.minutes} min, uses about 1%.',
                   style: Txt.muted(13),
                   textAlign: TextAlign.center,
                 ),
@@ -141,34 +155,6 @@ class ClimateScreen extends StatelessWidget {
       ],
     );
   }
-}
-
-class _Wide extends StatelessWidget {
-  const _Wide({required this.icon, required this.label, required this.on, required this.onTap});
-  final Widget Function(Color color) icon;
-  final String label;
-  final bool on;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        border: Border.all(color: on ? Palette.red : const Color(0xFF3A3A3C)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          icon(on ? Palette.red : Palette.light),
-          const SizedBox(width: 14),
-          Text(label, style: Txt.body(16)),
-        ],
-      ),
-    ),
-  );
 }
 
 /// The car from above, as in the mockup: the front seats show through the

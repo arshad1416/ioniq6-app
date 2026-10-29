@@ -41,6 +41,13 @@ class ValetPrefs {
   const ValetPrefs({this.speedLimitKmh = 80, this.pinSet = true, this.hideNavigation = true, this.hidePhone = true});
   final int speedLimitKmh;
   final bool pinSet, hideNavigation, hidePhone;
+
+  ValetPrefs copyWith({int? speedLimitKmh, bool? hideNavigation, bool? hidePhone}) => ValetPrefs(
+    speedLimitKmh: speedLimitKmh ?? this.speedLimitKmh,
+    pinSet: pinSet,
+    hideNavigation: hideNavigation ?? this.hideNavigation,
+    hidePhone: hidePhone ?? this.hidePhone,
+  );
 }
 
 class Settings {
@@ -69,7 +76,7 @@ class Settings {
   /// Ask for a fingerprint or face before a held control acts on the car.
   bool biometricCommands = false;
 
-  /// Valet preferences as shown in the app. Nothing here reaches the car yet.
+  /// Valet preferences, kept on the phone. Nothing here reaches the car yet.
   ValetPrefs valet = const ValetPrefs();
 
   Units get units => Units(miles: miles, fahrenheit: fahrenheit);
@@ -89,6 +96,11 @@ class Settings {
     keepLoggedIn = (await _backend.read('keepLoggedIn') ?? 'true') == 'true';
     biometricLogin = await _backend.read('biometricLogin') == 'true';
     biometricCommands = await _backend.read('biometricCommands') == 'true';
+    valet = ValetPrefs(
+      speedLimitKmh: int.tryParse(await _backend.read('valetLimit') ?? '') ?? 80,
+      hideNavigation: (await _backend.read('valetHideNav') ?? 'true') == 'true',
+      hidePhone: (await _backend.read('valetHidePhone') ?? 'true') == 'true',
+    );
   }
 
   Future<void> save() async {
@@ -104,5 +116,8 @@ class Settings {
     await _backend.write('keepLoggedIn', '$keepLoggedIn');
     await _backend.write('biometricLogin', '$biometricLogin');
     await _backend.write('biometricCommands', '$biometricCommands');
+    await _backend.write('valetLimit', '${valet.speedLimitKmh}');
+    await _backend.write('valetHideNav', '${valet.hideNavigation}');
+    await _backend.write('valetHidePhone', '${valet.hidePhone}');
   }
 }

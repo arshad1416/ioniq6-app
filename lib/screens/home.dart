@@ -8,6 +8,7 @@ import '../theme.dart';
 import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
+import '../widgets/line_icon.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -56,7 +57,7 @@ class HomeScreen extends StatelessWidget {
                   IconButton(
                     tooltip: 'Settings',
                     onPressed: () => Navigator.pushNamed(context, '/settings'),
-                    icon: const Icon(Icons.settings_outlined, color: Palette.mute),
+                    icon: const LineIcon(Glyphs.gear, size: 22, color: Palette.mute),
                   ),
                 ],
               ),
@@ -91,7 +92,7 @@ class HomeScreen extends StatelessWidget {
                 child: RowsCard(
                   children: [
                     NavRow(
-                      icon: Icons.directions_car_outlined,
+                      glyph: const LineIcon(Glyphs.car),
                       label: 'Controls',
                       value: car.allClosed ? _lockWord(store.lockState) : 'Something is open',
                       onTap: () => Navigator.pushNamed(context, '/controls'),
@@ -105,7 +106,7 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => Navigator.pushNamed(context, '/climate'),
                     ),
                     NavRow(
-                      icon: Icons.bolt_outlined,
+                      glyph: const LineIcon(Glyphs.bolt),
                       label: 'Charging',
                       value: car.charging
                           ? 'Charging · ${duration(car.chargeMinutesLeft ?? 0)} left'
@@ -113,22 +114,28 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => Navigator.pushNamed(context, '/charging'),
                     ),
                     NavRow(
-                      icon: Icons.bar_chart,
+                      glyph: const LineIcon(Glyphs.stats),
                       label: 'Stats',
                       value: '${thousands(units.dist(car.odometerKm))} ${units.distance}',
                       onTap: () => Navigator.pushNamed(context, '/stats'),
                     ),
                     NavRow(
-                      icon: Icons.favorite_border,
+                      glyph: const LineIcon(Glyphs.heart),
                       label: 'Health',
                       value: car.healthOk ? 'All good' : 'Needs a look',
                       onTap: () => Navigator.pushNamed(context, '/health'),
                     ),
                     NavRow(
-                      icon: Icons.show_chart,
+                      glyph: const LineIcon(Glyphs.activity),
                       label: 'Activity',
                       value: store.activity.isEmpty ? null : store.activity.first.title,
                       onTap: () => Navigator.pushNamed(context, '/activity'),
+                    ),
+                    NavRow(
+                      glyph: const LineIcon(Glyphs.camera),
+                      label: '360 Camera',
+                      sub: 'Surround view snapshots',
+                      onTap: () => Navigator.pushNamed(context, '/camera'),
                     ),
                   ],
                 ),
@@ -238,7 +245,7 @@ class _QuickActions extends StatelessWidget {
             enabled: store.pending == null,
             onHeld: () => runCommand(context, locked ? const UnlockCommand() : const LockCommand()),
             builder: (context, p) => _Qa(
-              icon: locked ? Icons.lock_outline : Icons.lock_open,
+              glyph: LineIcon(locked ? Glyphs.lock : Glyphs.lockOpen),
               label: _lockWord(store.lockState),
               on: locked,
               progress: p,
@@ -257,7 +264,7 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _Qa(
-            icon: Icons.bolt,
+            glyph: const LineIcon(Glyphs.bolt),
             label: 'Charge',
             on: store.car.charging,
             onTap: () => Navigator.pushNamed(context, '/charging'),
@@ -266,7 +273,7 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _Qa(
-            icon: Icons.directions_car_outlined,
+            glyph: const LineIcon(Glyphs.car),
             label: 'Controls',
             onTap: () => Navigator.pushNamed(context, '/controls'),
           ),
@@ -277,9 +284,8 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _Qa extends StatelessWidget {
-  const _Qa({this.icon, this.glyph, required this.label, this.on = false, this.onTap, this.progress = 0});
-  final IconData? icon;
-  final Widget? glyph;
+  const _Qa({required this.glyph, required this.label, this.on = false, this.onTap, this.progress = 0});
+  final Widget glyph;
   final String label;
   final bool on;
   final VoidCallback? onTap;
@@ -301,7 +307,7 @@ class _Qa extends StatelessWidget {
               size: 34,
               child: IconTheme(
                 data: IconThemeData(color: color, size: 24),
-                child: glyph ?? Icon(icon),
+                child: glyph,
               ),
             ),
             const SizedBox(height: 4),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../motion.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/top_car.dart';
 
 class StatsScreen extends StatefulWidget {
   const StatsScreen({super.key});
@@ -200,30 +201,30 @@ class HealthScreen extends StatelessWidget {
               Kv('Next service (Bluelink)', 'at ${thousands(units.dist(car.nextServiceKm))} ${units.distance}'),
           ],
         ),
-        const Lbl('Tires'),
         _TireMap(warnings: car.tireWarnings),
       ],
     );
   }
 }
 
-/// The car from above with each tire's status beside its wheel.
+/// The car from above with each tire's status just outside its wheel, as in
+/// the mockup: labels at 21% (front) and 77% (rear) of the car's height, each
+/// with a 12 px leader line.
 class _TireMap extends StatelessWidget {
   const _TireMap({required this.warnings});
   final Map<String, bool> warnings;
 
-  // Where things sit in top.webp once turned upright (front at the top), as
-  // fractions of the image: the body's sides and the two axles.
-  static const _bodyLeft = .24, _bodyRight = .76, _frontAxle = .21, _rearAxle = .77;
-  static const _height = 340.0, _aspect = 750 / 1200;
+  static const _frontAxle = .21, _rearAxle = .77;
+  static const _height = 340.0, _lead = 12.0;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: _height,
     child: LayoutBuilder(
       builder: (context, box) {
-        const carW = _height * _aspect;
-        final left = (box.maxWidth - carW) / 2;
+        const carW = _height * TopCar.aspect;
+        // TopCar centres its box, then nudges it right by 3.3%.
+        final left = (box.maxWidth - carW) / 2 + carW * .033, right = left + carW;
         Widget badge(String k, double axle, bool onLeft) {
           final low = warnings[k] == true;
           final chip = Container(
@@ -235,29 +236,20 @@ class _TireMap extends StatelessWidget {
             ),
             child: Text('$k ${low ? 'low' : 'ok'}', style: Txt.mono(13, color: low ? Palette.amber : Palette.ok)),
           );
-          final lead = Container(width: 14, height: 1, color: Palette.line);
-          final edge = left + carW * (onLeft ? _bodyLeft : _bodyRight);
+          final lead = Container(width: _lead, height: 1, color: Palette.line);
           return Positioned(
             top: _height * axle - 12,
             height: 24,
-            left: onLeft ? null : edge + 4,
-            right: onLeft ? box.maxWidth - edge + 4 : null,
+            right: onLeft ? box.maxWidth - left - _lead : null,
+            left: onLeft ? null : right - _lead,
             child: Row(mainAxisSize: MainAxisSize.min, children: onLeft ? [chip, lead] : [lead, chip]),
           );
         }
 
         return Stack(
+          clipBehavior: Clip.none,
           children: [
-            Positioned(
-              left: left,
-              width: carW,
-              top: 0,
-              bottom: 0,
-              child: Hero(
-                tag: 'car',
-                child: RotatedBox(quarterTurns: 1, child: Image.asset('assets/images/top.webp', fit: BoxFit.contain)),
-              ),
-            ),
+            const Center(child: TopCar(height: _height)),
             badge('FL', _frontAxle, true),
             badge('FR', _frontAxle, false),
             badge('RL', _rearAxle, true),

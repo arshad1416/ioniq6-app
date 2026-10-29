@@ -7,6 +7,7 @@ import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/dock.dart';
 import '../widgets/hold_button.dart';
+import '../widgets/line_icon.dart';
 import '../widgets/top_car.dart';
 import 'valet.dart';
 
@@ -58,11 +59,11 @@ class ControlsScreen extends StatelessWidget {
                       builder: (context, p) => HoldRing(
                         progress: p,
                         size: 48,
-                        child: Icon(
-                          locked ? Icons.lock_outline : Icons.lock_open,
+                        child: LineIcon(
+                          locked ? Glyphs.lock : Glyphs.lockOpen,
                           size: 28,
+                          stroke: 1.8,
                           color: locked ? const Color(0xFFE6E6E8) : Palette.red,
-                          shadows: const [Shadow(blurRadius: 3)],
                         ),
                       ),
                     ),
@@ -74,12 +75,7 @@ class ControlsScreen extends StatelessWidget {
                       onHeld: () => runCommand(context, const OpenChargePortCommand()),
                       builder: (context, p) => HoldRing(
                         progress: p,
-                        child: const Icon(
-                          Icons.bolt,
-                          color: Color(0xFFE6E6E8),
-                          size: 28,
-                          shadows: [Shadow(blurRadius: 3)],
-                        ),
+                        child: const LineIcon(Glyphs.bolt, color: Color(0xFFE6E6E8), size: 28, stroke: 1.8),
                       ),
                     ),
                   ),
@@ -106,10 +102,10 @@ class ControlsScreen extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              DockItem(icon: Icons.highlight, label: 'Flash', command: const FlashCommand()),
-              DockItem(icon: Icons.campaign_outlined, label: 'Honk', command: const HonkCommand()),
+              DockItem(glyph: const LineIcon(Glyphs.flash), label: 'Flash', command: const FlashCommand()),
+              DockItem(glyph: const LineIcon(Glyphs.honk), label: 'Honk', command: const HonkCommand()),
               DockItem(glyph: const ClimateIcon(), label: 'Climate', route: '/climate'),
-              DockItem(icon: Icons.place_outlined, label: 'Find', onTap: () => _find(context)),
+              DockItem(glyph: const LineIcon(Glyphs.pin), label: 'Find', onTap: () => _find(context)),
             ],
           ),
         ),
@@ -141,16 +137,15 @@ class _ValetSwitch extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = AppScope.of(context).settings.valet;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       decoration: BoxDecoration(
-        color: Palette.raise.withValues(alpha: .85),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Palette.line),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF3A3A3C)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.room_service_outlined, size: 20, color: Palette.mute),
-          const SizedBox(width: 10),
+          const LineIcon(Glyphs.valet, size: 22, color: Palette.light),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,7 +162,8 @@ class _ValetSwitch extends StatelessWidget {
           IconButton(
             tooltip: 'Valet settings',
             onPressed: () => Navigator.pushNamed(context, '/valet'),
-            icon: const Icon(Icons.settings_outlined, color: Palette.light, size: 20),
+            style: IconButton.styleFrom(backgroundColor: Palette.unlit, fixedSize: const Size.square(34)),
+            icon: const LineIcon(Glyphs.gear, color: Palette.light, size: 18),
           ),
           GestureDetector(onTap: () => valetComingSoon(context), child: const Switch(value: false, onChanged: null)),
         ],

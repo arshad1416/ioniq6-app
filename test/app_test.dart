@@ -46,8 +46,13 @@ void main() {
 
   testWidgets('every screen opens from home', (tester) async {
     await pumpApp(tester);
-    for (final (row, title) in [('Stats', 'Stats'), ('Health', 'Health'), ('Activity', 'Activity')]) {
-      await tester.ensureVisible(find.text(row).last);
+    for (final (row, title) in [
+      ('Stats', 'Stats'),
+      ('Health', 'Health'),
+      ('Activity', 'Activity'),
+      ('360 Camera', '360 Camera'),
+    ]) {
+      await tester.dragUntilVisible(find.text(row), find.byType(ListView), const Offset(0, -200));
       await tester.pumpAndSettle();
       await tester.tap(find.text(row).last);
       await tester.pumpAndSettle();

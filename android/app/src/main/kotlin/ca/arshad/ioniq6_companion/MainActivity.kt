@@ -39,6 +39,15 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ioniq6/installer").setMethodCallHandler { call, result ->
+            if (call.method != "install") return@setMethodCallHandler result.notImplemented()
+            try {
+                Installer.install(this, call.argument<String>("path")!!)
+                result.success(null)
+            } catch (e: Exception) {
+                result.error("install", e.message, null)
+            }
+        }
     }
 
     private fun askForNotifications() {

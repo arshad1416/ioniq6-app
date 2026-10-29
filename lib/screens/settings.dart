@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../car/car_store.dart';
 import '../theme.dart';
+import '../update/update_prompt.dart';
 import '../widgets/common.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -159,6 +161,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: 'Phone and car',
               sub: 'OnePlus 13 Bluetooth to IONIQ 6',
               value: car.phoneConnected ? 'Connected' : 'Not connected',
+            ),
+          ],
+        ),
+        const Lbl('App'),
+        RowsCard(
+          children: [
+            FutureBuilder(
+              future: PackageInfo.fromPlatform(),
+              builder: (context, info) => NavRow(
+                icon: Icons.system_update,
+                label: 'Check for updates',
+                sub: 'New versions come from GitHub Releases',
+                value: info.hasData ? info.data!.version : null,
+                onTap: () => checkForUpdate(context, manual: true),
+              ),
             ),
           ],
         ),

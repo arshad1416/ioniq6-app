@@ -11,6 +11,7 @@ import 'screens/home.dart';
 import 'screens/info_screens.dart';
 import 'screens/settings.dart';
 import 'theme.dart';
+import 'update/update_prompt.dart';
 import 'widgets/common.dart';
 
 void main() {
@@ -25,17 +26,24 @@ void main() {
   final store = CarStore(Settings(DeviceSettingsBackend()))..start();
   PlatformBridge(store).attach();
   runApp(CompanionApp(store: store));
+  // Look for a new release on GitHub once the app has settled.
+  Future.delayed(const Duration(seconds: 3), () {
+    final context = CompanionApp.navigator.currentState?.overlay?.context;
+    if (context != null && context.mounted) checkForUpdate(context);
+  });
 }
 
 class CompanionApp extends StatelessWidget {
   const CompanionApp({super.key, required this.store});
   final CarStore store;
+  static final navigator = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) => AppScope(
     store: store,
     child: MaterialApp(
       title: 'IONIQ 6',
+      navigatorKey: navigator,
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routes: {

@@ -20,7 +20,11 @@ class ValetScreen extends StatelessWidget {
     final v = AppScope.of(context).settings.valet;
     Widget locked(String title, bool value) => Opacity(
       opacity: .5,
-      child: SwitchListTile(title: Text(title, style: Txt.body(14)), value: value, onChanged: null),
+      child: SwitchListTile(
+        title: Text(title, style: Txt.body(14)),
+        value: value,
+        onChanged: null,
+      ),
     );
     return SubScreen(
       title: 'Valet mode',

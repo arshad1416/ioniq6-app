@@ -139,8 +139,11 @@ class StatusChip extends StatelessWidget {
 }
 
 class NavRow extends StatelessWidget {
-  const NavRow({super.key, required this.icon, required this.label, this.sub, this.value, this.onTap});
-  final IconData icon;
+  const NavRow({super.key, this.icon, this.glyph, required this.label, this.sub, this.value, this.onTap});
+  final IconData? icon;
+
+  /// Drawn in place of [icon], for icons that aren't in the icon font.
+  final Widget? glyph;
   final String label;
   final String? sub, value;
   final VoidCallback? onTap;
@@ -152,7 +155,10 @@ class NavRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: Palette.mute),
+          IconTheme(
+            data: const IconThemeData(size: 20, color: Palette.mute),
+            child: glyph ?? Icon(icon),
+          ),
           const SizedBox(width: 12),
           Expanded(
             flex: 5,

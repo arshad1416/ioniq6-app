@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../car/car_state.dart';
 import '../car/commands.dart';
 import '../theme.dart';
+import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
 import '../widgets/rive_view.dart';
@@ -155,7 +156,7 @@ class ControlsScreen extends StatelessWidget {
             children: [
               _Dock(icon: Icons.highlight, label: 'Flash', command: const FlashCommand()),
               _Dock(icon: Icons.campaign_outlined, label: 'Honk', command: const HonkCommand()),
-              _Dock(icon: Icons.ac_unit, label: 'Climate', route: '/climate'),
+              _Dock(glyph: const ClimateIcon(), label: 'Climate', route: '/climate'),
               _Dock(icon: Icons.place_outlined, label: 'Find', onTap: () => _find(context)),
             ],
           ),
@@ -179,8 +180,9 @@ class ControlsScreen extends StatelessWidget {
 }
 
 class _Dock extends StatelessWidget {
-  const _Dock({required this.icon, required this.label, this.command, this.route, this.onTap});
-  final IconData icon;
+  const _Dock({this.icon, this.glyph, required this.label, this.command, this.route, this.onTap});
+  final IconData? icon;
+  final Widget? glyph;
   final String label;
   final CarCommand? command;
   final String? route;
@@ -195,7 +197,10 @@ class _Dock extends StatelessWidget {
           HoldRing(
             progress: p,
             size: 36,
-            child: Icon(icon, color: Palette.light, size: 26),
+            child: IconTheme(
+              data: const IconThemeData(color: Palette.light, size: 26),
+              child: glyph ?? Icon(icon),
+            ),
           ),
           const SizedBox(height: 4),
           Text(label, style: Txt.muted(12), maxLines: 1, overflow: TextOverflow.fade, softWrap: false),

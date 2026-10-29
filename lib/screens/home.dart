@@ -6,6 +6,7 @@ import '../car/car_store.dart';
 import '../car/commands.dart';
 import '../motion.dart';
 import '../theme.dart';
+import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
 
@@ -97,7 +98,7 @@ class HomeScreen extends StatelessWidget {
                       onTap: () => Navigator.pushNamed(context, '/controls'),
                     ),
                     NavRow(
-                      icon: Icons.thermostat_outlined,
+                      glyph: const ClimateIcon(),
                       label: 'Climate',
                       value: car.climateOn
                           ? 'On · ${units.temp(car.setTempC)}'
@@ -245,7 +246,7 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _Qa(
-            icon: Icons.ac_unit,
+            glyph: const ClimateIcon(),
             label: 'Climate',
             on: store.car.climateOn,
             onTap: () => Navigator.pushNamed(context, '/climate'),
@@ -274,8 +275,9 @@ class _QuickActions extends StatelessWidget {
 }
 
 class _Qa extends StatelessWidget {
-  const _Qa({required this.icon, required this.label, this.on = false, this.onTap, this.progress = 0});
-  final IconData icon;
+  const _Qa({this.icon, this.glyph, required this.label, this.on = false, this.onTap, this.progress = 0});
+  final IconData? icon;
+  final Widget? glyph;
   final String label;
   final bool on;
   final VoidCallback? onTap;
@@ -295,7 +297,10 @@ class _Qa extends StatelessWidget {
             HoldRing(
               progress: progress,
               size: 34,
-              child: Icon(icon, color: color, size: 24),
+              child: IconTheme(
+                data: IconThemeData(color: color, size: 24),
+                child: glyph ?? Icon(icon),
+              ),
             ),
             const SizedBox(height: 4),
             Text(

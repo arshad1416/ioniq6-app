@@ -51,6 +51,7 @@ void main() {
       ('Health', 'Health'),
       ('Activity', 'Activity'),
       ('360 Camera', '360 Camera'),
+      ('Next trip', 'Next trip'),
     ]) {
       await tester.dragUntilVisible(find.text(row), find.byType(ListView), const Offset(0, -200));
       await tester.pumpAndSettle();
@@ -62,7 +63,7 @@ void main() {
     }
   });
 
-  for (final route in ['/controls', '/climate', '/charging', '/settings', '/camera', '/emergency', '/valet']) {
+  for (final route in ['/controls', '/climate', '/charging', '/settings', '/camera', '/emergency', '/valet', '/trip']) {
     testWidgets('$route lays out without errors', (tester) async {
       await pumpApp(tester);
       tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);

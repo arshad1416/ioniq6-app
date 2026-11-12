@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import '../bluelink/bluelink_client.dart';
+import '../bluelink/bluelink_states.dart';
 
 import '../ha/entities.dart';
 import '../ha/entity_map.dart';
@@ -43,13 +47,27 @@ class CarStore extends ChangeNotifier {
     HaClient Function(Uri, String)? clientFactory,
     OutsideWeather? weather,
     CameraCache? cameras,
+    http.Client? bluelinkHttp,
   }) : _clientFactory = clientFactory ?? ((url, token) => HaClient(baseUrl: url, token: token)),
        weather = weather ?? OutsideWeather(),
-       cameras = cameras ?? CameraCache();
+       cameras = cameras ?? CameraCache() {
+    bluelink = BluelinkClient(
+      credentials: () => settings.bluelinkCredentials,
+      session: BluelinkSession.create(),
+      onSession: (session) {
+        settings.bluelinkSession = jsonEncode(session.toJson());
+        return settings.saveBluelink();
+      },
+      client: bluelinkHttp,
+    );
+  }
 
   final Settings settings;
   final OutsideWeather weather;
   final CameraCache cameras;
+
+  /// The fallback path: straight to Bluelink when Home Assistant can't reach the car.
+  late final BluelinkClient bluelink;
   final HaClient Function(Uri, String) _clientFactory;
 
   CarState car = CarState.empty;
@@ -78,6 +96,24 @@ class CarStore extends ChangeNotifier {
   /// When the 360 shots saved on the phone were taken.
   DateTime? _savedShotsAt;
 
+  /// Home Assistant has failed more than once in a row.
+  bool _haDown = false;
+
+  /// The last read straight from Bluelink worked, and when it was.
+  bool _directOk = false;
+  DateTime? _directAt;
+  bool _directBusy = false;
+
+  /// Why the last direct read failed, if it did.
+  String? directError;
+
+  /// Set once the user has agreed, in this run of the app, to send commands
+  /// straight to Bluelink while Home Assistant is down.
+  bool directCommandsConfirmed = false;
+
+  /// Direct reads are spaced at least this far apart unless the user asks.
+  static const _directEvery = Duration(minutes: 2);
+
   /// Quick, silent retries before the error banner shows. Right after the
   /// phone wakes or switches networks, DNS often fails for a few seconds.
   static const _quietRetries = [Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
@@ -99,24 +135,43 @@ class CarStore extends ChangeNotifier {
 
   /// Which link to the car is broken, if any.
   Health get health {
-    final extrasMissing = connection == Connection.live && !_map.extrasFound;
-    Health at(Link link) => Health(link, detail: error, extrasMissing: extrasMissing);
+    final link = _haLink;
+    final broken = !const {Link.ok, Link.demo, Link.stale}.contains(link);
+    return Health(
+      link,
+      detail: directError ?? error,
+      extrasMissing: connection == Connection.live && !_map.extrasFound,
+      direct: broken && usingDirect && _directOk,
+    );
+  }
+
+  /// The Bluelink fallback is signed in on this phone.
+  bool get directReady => bluelink.session.signedIn && settings.bluelinkCredentials != null;
+
+  /// Home Assistant's path to the car is broken and the fallback is standing in.
+  bool get usingDirect {
+    if (isDemo || !directReady) return false;
+    return _haDown || const {Link.tokenRejected, Link.integrationMissing, Link.carUnavailable}.contains(_haLink);
+  }
+
+  /// The state of the Home Assistant path alone.
+  Link get _haLink {
     switch (connection) {
       case Connection.demo:
-        return at(Link.demo);
+        return Link.demo;
       case Connection.none || Connection.connecting:
-        return at(Link.connecting);
+        return Link.connecting;
       case Connection.error:
-        if (_lastError is HaAuthException) return at(Link.tokenRejected);
+        if (_lastError is HaAuthException) return Link.tokenRejected;
         final text = '$_lastError';
         final offline = text.contains('Failed host lookup') || text.contains('Network is unreachable');
-        return at(offline ? Link.noNetwork : Link.haUnreachable);
+        return offline ? Link.noNetwork : Link.haUnreachable;
       case Connection.live:
-        if (!_map.integrationFound || !car.hasCar) return at(Link.integrationMissing);
-        if (_down.contains(E.soc) && _down.contains(E.lock)) return at(Link.carUnavailable);
+        if (!_map.integrationFound || !car.hasCar) return Link.integrationMissing;
+        if (_down.contains(E.soc) && _down.contains(E.lock)) return Link.carUnavailable;
         final reported = car.lastUpdated;
-        if (reported != null && DateTime.now().difference(reported) > staleAfter) return at(Link.stale);
-        return at(Link.ok);
+        if (reported != null && DateTime.now().difference(reported) > staleAfter) return Link.stale;
+        return Link.ok;
     }
   }
 
@@ -130,6 +185,9 @@ class CarStore extends ChangeNotifier {
     if (settings.demo || !settings.isConfigured) {
       _startDemo();
     } else {
+      if (settings.bluelinkSession != null) {
+        bluelink.session = BluelinkSession.fromJson(jsonDecode(settings.bluelinkSession!) as Map<String, dynamic>);
+      }
       await cameras.init();
       await _loadSnapshot();
       await connect();
@@ -224,8 +282,10 @@ class CarStore extends ChangeNotifier {
     error = null;
     _lastError = null;
     _failures = 0;
+    _haDown = false;
     notifyListeners();
     unawaited(loadHistory());
+    _directIfNeeded();
   }
 
   /// Finds the car's device and entities in this Home Assistant. A token
@@ -259,6 +319,7 @@ class CarStore extends ChangeNotifier {
     _saveShots();
     _settlePending();
     notifyListeners();
+    _directIfNeeded();
   }
 
   /// Copies new 360 shots to the phone.
@@ -279,15 +340,51 @@ class CarStore extends ChangeNotifier {
     _retry?.cancel();
     _lastError = e;
     if (e is! HaAuthException && _failures < _quietRetries.length) {
+      // One failure can be a blip; from the second on, stop waiting for
+      // Home Assistant and ask Bluelink.
+      _haDown = _failures >= 1;
       _retry = Timer(_quietRetries[_failures++], connect);
+      _directIfNeeded();
       return; // still "connecting"; the last known state stays on screen
     }
+    _haDown = true;
     connection = Connection.error;
     error = '$e';
     notifyListeners();
+    _directIfNeeded();
     if (e is HaAuthException) return; // a new token is the only fix
     final wait = Duration(seconds: 20 * (++_failures - _quietRetries.length));
     _retry = Timer(wait > _slowestRetry ? _slowestRetry : wait, connect);
+  }
+
+  void _directIfNeeded() {
+    if (!usingDirect || _directBusy) return;
+    final last = _directAt;
+    if (last != null && DateTime.now().difference(last) < _directEvery) return;
+    unawaited(directRefresh());
+  }
+
+  /// Reads the car's status straight from Bluelink: the last one it
+  /// reported, or with [wake] a fresh one from the car itself.
+  Future<void> directRefresh({bool wake = false}) async {
+    if (_directBusy) return;
+    _directBusy = true;
+    _directAt = DateTime.now();
+    try {
+      final status = await bluelink.status(wake: wake);
+      final limits = await bluelink.chargeLimits();
+      car = car.withEntities(statesFromBluelink(status, limits: limits));
+      dataAt = DateTime.now();
+      _directOk = true;
+      directError = null;
+      _saveSnapshotSoon();
+    } catch (e) {
+      _directOk = false;
+      directError = '$e';
+    } finally {
+      _directBusy = false;
+      notifyListeners();
+    }
   }
 
   /// The app came back to the foreground: the socket may have died while the
@@ -363,6 +460,18 @@ class CarStore extends ChangeNotifier {
     try {
       if (isDemo) {
         await Future<void>.delayed(const Duration(milliseconds: 1200));
+      } else if (usingDirect) {
+        final at = await bluelink.locate();
+        if (at == null) throw BluelinkException('The car didn\'t share its location');
+        final now = DateTime.now();
+        car = car.withEntity(
+          EntityState(E.parked, 'not_home', {
+            'latitude': at.$1,
+            'longitude': at.$2,
+            'located_at': now.toUtc().toIso8601String(),
+          }, now),
+        );
+        _saveSnapshotSoon();
       } else {
         await _call('ioniq6_extras', 'locate', const {});
       }
@@ -405,7 +514,11 @@ class CarStore extends ChangeNotifier {
     try {
       if (isDemo) {
         await Future<void>.delayed(const Duration(milliseconds: 1600));
-        _applyDemo(cmd);
+        _apply(cmd);
+      } else if (usingDirect) {
+        if (!BluelinkClient.supports(cmd)) throw PathDown('${cmd.label} needs Home Assistant, which is down');
+        await bluelink.send(cmd); // returns once the car has confirmed
+        _apply(cmd);
       } else {
         await _call(cmd.domain, cmd.service, cmd.data);
         // The integration refreshes after a command; wait for HA to show it.
@@ -413,7 +526,15 @@ class CarStore extends ChangeNotifier {
         _pendingTimeout = Timer(const Duration(seconds: 90), () => _clearPending());
         _settlePending();
       }
-      _localLog.add(ActivityItem(DateTime.now(), cmd.label, isDemo ? 'Demo, nothing was sent' : 'From this phone'));
+      _localLog.add(
+        ActivityItem(
+          DateTime.now(),
+          cmd.label,
+          isDemo
+              ? 'Demo, nothing was sent'
+              : (usingDirect ? 'From this phone, straight to Bluelink' : 'From this phone'),
+        ),
+      );
     } catch (e) {
       _localLog.add(ActivityItem(DateTime.now(), '${cmd.label} failed', '$e'));
       if (cmd is LockCommand || cmd is UnlockCommand) {
@@ -450,11 +571,13 @@ class CarStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _applyDemo(CarCommand cmd) {
+  /// Shows [cmd]'s effect without waiting for a status: in demo mode, and
+  /// after Bluelink has confirmed a command sent to it directly.
+  void _apply(CarCommand cmd) {
     final now = DateTime.now();
     void set(String id, String state) {
-      final prev = demoStates()[id]!;
-      car = car.withEntity(prev.copyWith(state: state, lastChanged: now));
+      final prev = car.entities.where((e) => e.entityId == id).firstOrNull;
+      car = car.withEntity(prev?.copyWith(state: state, lastChanged: now) ?? EntityState(id, state, const {}, now));
     }
 
     switch (cmd) {
@@ -504,6 +627,34 @@ class CarStore extends ChangeNotifier {
     if (isDemo) return;
     _failures = 0;
     await connect();
+    if (usingDirect) await directRefresh();
+  }
+
+  /// Signs the fallback in to Bluelink with the login in [settings]. Returns
+  /// a challenge when Bluelink wants a one-time code for this phone first.
+  Future<OtpChallenge?> directSignIn() async {
+    await settings.saveBluelink();
+    final challenge = await bluelink.signIn();
+    notifyListeners();
+    return challenge;
+  }
+
+  Future<void> directVerify(OtpChallenge challenge, String code) async {
+    await bluelink.verifyOtp(challenge, code);
+    notifyListeners();
+  }
+
+  /// Signs out of Bluelink and forgets the login.
+  Future<void> directSignOut() async {
+    await bluelink.signOut();
+    settings
+      ..bluelinkUser = ''
+      ..bluelinkPassword = ''
+      ..bluelinkPin = '';
+    await settings.saveBluelink();
+    _directOk = false;
+    directError = null;
+    notifyListeners();
   }
 
   /// Saves new settings and reconnects (or switches to demo).

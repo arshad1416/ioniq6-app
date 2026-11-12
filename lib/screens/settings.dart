@@ -8,6 +8,7 @@ import '../security/biometrics.dart';
 import '../theme.dart';
 import '../update/update_prompt.dart';
 import '../widgets/common.dart';
+import 'bluelink_setup.dart';
 import '../widgets/line_icon.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -277,6 +278,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }),
           ],
         ),
+        const Lbl('Bluelink fallback'),
+        const BluelinkSetup(),
         const Lbl('Security & privacy'),
         RowsCard(
           children: [

@@ -81,6 +81,28 @@ Future<void> runCommand(BuildContext context, CarCommand cmd) async {
     messenger.showSnackBar(SnackBar(content: Text('${cmd.label}: not confirmed, nothing sent')));
     return;
   }
+  if (store.settings.commandsEnabled && store.usingDirect && !store.directCommandsConfirmed) {
+    if (!context.mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Send straight to Bluelink?'),
+        content: Text(
+          'Home Assistant can\'t reach the car right now. ${cmd.label} will go from this phone directly to Bluelink. '
+          'You won\'t be asked again until the app restarts.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (ok != true) {
+      messenger.showSnackBar(SnackBar(content: Text('${cmd.label}: nothing sent')));
+      return;
+    }
+    store.directCommandsConfirmed = true;
+  }
   try {
     await store.send(cmd);
     messenger.showSnackBar(

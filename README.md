@@ -1,8 +1,9 @@
 # Ioniq 6 Companion
 
-An Android app (Flutter) for a 2023 Hyundai Ioniq 6. It talks only to Home
-Assistant, which already runs the Hyundai/Kia (`kia_uvo`) integration. The app
-never logs in to Bluelink itself, so there is only one Bluelink session.
+An Android app (Flutter) for a 2023 Hyundai Ioniq 6. It talks to Home
+Assistant, which already runs the Hyundai/Kia (`kia_uvo`) integration. As an
+optional fallback it can sign in to Bluelink itself, and uses that only while
+Home Assistant can't reach the car.
 
 ![Screens](docs/screens.png)
 
@@ -34,6 +35,20 @@ never logs in to Bluelink itself, so there is only one Bluelink session.
 - The car's device and entities are **looked up at each connect**, so removing and re-adding
   the Hyundai integration needs no new build.
 - An optional **address on home Wi-Fi** is tried first, so the app works at home without the internet.
+
+### Bluelink fallback (optional)
+
+Sign in under Settings, Bluelink fallback, with your Bluelink email, password and PIN
+(a new phone is confirmed once with an emailed code). They stay in the phone's secure storage.
+
+- The app talks to Bluelink only after Home Assistant has failed twice in a row, or when
+  Home Assistant is up but its Hyundai integration is missing or has no data. It never polls:
+  it reads the car's last reported status when the app opens or you refresh.
+- Lock, unlock, climate, charging, charge limits, valet, battery warming and Find My Car work
+  this way. Flash, honk, the charge port and new 360 shots still need Home Assistant.
+- The first command in each run of the app asks before it goes straight to Bluelink.
+- Home Assistant's own extras (home charger rate and cost, walk-away lock, activity history)
+  show their last saved values.
 
 ## Setup
 

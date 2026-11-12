@@ -26,7 +26,7 @@ enum Link {
 
 /// The state of the path to the car, in words the screens can show.
 class Health {
-  const Health(this.link, {this.detail, this.extrasMissing = false});
+  const Health(this.link, {this.detail, this.extrasMissing = false, this.direct = false});
 
   final Link link;
 
@@ -37,13 +37,14 @@ class Health {
   /// warming and the 360 camera need it).
   final bool extrasMissing;
 
+  /// Home Assistant's path is broken and the app is talking to Bluelink
+  /// itself until it's back.
+  final bool direct;
+
   bool get ok => link == Link.ok || link == Link.demo;
 
   /// Whether a command has any chance of reaching the car.
-  bool get canCommand => ok || link == Link.stale;
-
-  /// Whether what's on screen comes straight from Home Assistant right now.
-  bool get live => ok || link == Link.stale || link == Link.carUnavailable || link == Link.integrationMissing;
+  bool get canCommand => ok || link == Link.stale || direct;
 
   String? get title => switch (link) {
     Link.ok || Link.demo || Link.connecting => null,
@@ -55,7 +56,9 @@ class Health {
     Link.stale => 'The car hasn\'t reported for a while',
   };
 
-  String? get advice => switch (link) {
+  String? get advice => direct ? 'Using Bluelink directly until it\'s back.' : _advice;
+
+  String? get _advice => switch (link) {
     Link.ok || Link.demo || Link.connecting => null,
     Link.noNetwork => 'Retrying when the phone is back online.',
     Link.haUnreachable => 'Retrying. Check that Home Assistant and its remote address are up.',

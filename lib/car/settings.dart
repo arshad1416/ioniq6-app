@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../bluelink/bluelink_client.dart';
 import 'commands.dart';
 import 'units.dart';
 
@@ -11,7 +12,7 @@ abstract class SettingsBackend {
 }
 
 class DeviceSettingsBackend implements SettingsBackend {
-  static const _secret = {'token'};
+  static const _secret = {'token', 'bluelinkUser', 'bluelinkPassword', 'bluelinkPin', 'bluelinkSession'};
   final _secure = const FlutterSecureStorage();
 
   @override
@@ -55,6 +56,10 @@ class Settings {
   final SettingsBackend _backend;
 
   String haUrl = '';
+
+  /// Optional address on the home network, tried first so the app doesn't
+  /// need the internet when the phone is at home.
+  String haLocalUrl = '';
   String token = '';
   bool demo = true;
 
@@ -83,8 +88,38 @@ class Settings {
 
   bool get isConfigured => haUrl.isNotEmpty && token.isNotEmpty;
 
+  /// The Bluelink login for the direct fallback, kept in the phone's secure
+  /// storage. Empty until the user signs in under Settings.
+  String bluelinkUser = '';
+  String bluelinkPassword = '';
+  String bluelinkPin = '';
+
+  /// The Bluelink sign-in (tokens and this phone's device id) as JSON.
+  String? bluelinkSession;
+
+  BluelinkCredentials? get bluelinkCredentials =>
+      bluelinkUser.isEmpty || bluelinkPassword.isEmpty || bluelinkPin.isEmpty
+      ? null
+      : BluelinkCredentials(user: bluelinkUser, password: bluelinkPassword, pin: bluelinkPin);
+
+  Future<void> saveBluelink() async {
+    await _backend.write('bluelinkUser', bluelinkUser.isEmpty ? null : bluelinkUser);
+    await _backend.write('bluelinkPassword', bluelinkPassword.isEmpty ? null : bluelinkPassword);
+    await _backend.write('bluelinkPin', bluelinkPin.isEmpty ? null : bluelinkPin);
+    await _backend.write('bluelinkSession', bluelinkSession);
+  }
+
+  /// App data that isn't a setting, such as the last car snapshot.
+  Future<String?> readCache(String key) => _backend.read('cache.$key');
+  Future<void> writeCache(String key, String? value) => _backend.write('cache.$key', value);
+
   Future<void> load() async {
     haUrl = await _backend.read('haUrl') ?? '';
+    haLocalUrl = await _backend.read('haLocalUrl') ?? '';
+    bluelinkUser = await _backend.read('bluelinkUser') ?? '';
+    bluelinkPassword = await _backend.read('bluelinkPassword') ?? '';
+    bluelinkPin = await _backend.read('bluelinkPin') ?? '';
+    bluelinkSession = await _backend.read('bluelinkSession');
     token = await _backend.read('token') ?? '';
     demo = (await _backend.read('demo') ?? 'true') == 'true';
     commandsEnabled = await _backend.read('commandsEnabled') == 'true';
@@ -105,6 +140,7 @@ class Settings {
 
   Future<void> save() async {
     await _backend.write('haUrl', haUrl);
+    await _backend.write('haLocalUrl', haLocalUrl);
     await _backend.write('token', token.isEmpty || !keepLoggedIn ? null : token);
     await _backend.write('demo', '$demo');
     await _backend.write('commandsEnabled', '$commandsEnabled');

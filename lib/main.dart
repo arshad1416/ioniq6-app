@@ -32,6 +32,7 @@ Future<void> main() async {
   await settings.load(); // so the lock gate knows whether to show
   final store = CarStore(settings)..start();
   PlatformBridge(store).attach();
+  AppLifecycleListener(onResume: store.onResume);
   runApp(CompanionApp(store: store));
   // Look for a new release on GitHub once the app has settled.
   Future.delayed(const Duration(seconds: 3), () {

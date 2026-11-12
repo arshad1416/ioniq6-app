@@ -129,6 +129,12 @@ class Lbl extends StatelessWidget {
 
 class StatusChip extends StatelessWidget {
   const StatusChip(this.text, {super.key, this.ok = true});
+
+  /// A chip for a value that may not be known: [good] when [ok] is true,
+  /// [bad] when false, and "[what] unknown" in amber when null.
+  factory StatusChip.known(bool? ok, {Key? key, required String what, required String good, required String bad}) =>
+      StatusChip(ok == null ? '$what unknown' : (ok ? good : bad), key: key, ok: ok ?? false);
+
   final String text;
   final bool ok;
 

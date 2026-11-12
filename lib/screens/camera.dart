@@ -191,6 +191,12 @@ class _Viewer extends StatelessWidget {
     final store = AppScope.of(context);
     final picture = latestOnly ? null : store.car.cameraPicture(_entityView(view));
     final url = picture == null ? null : store.haUri(picture);
+    final fit = view == CameraView.surround ? BoxFit.contain : BoxFit.cover;
+    // The copy on the phone, for when Home Assistant can't be reached.
+    final saved = latestOnly ? null : store.cameras.saved(_entityView(view));
+    Widget offline() => saved == null
+        ? const CustomPaint(painter: _GuidePainter())
+        : Image.file(saved, fit: fit, gaplessPlayback: true);
     final taken = store.car.cameraTakenAt;
     final label = latestOnly
         ? 'Only the latest is kept'
@@ -216,12 +222,14 @@ class _Viewer extends StatelessWidget {
             children: [
               if (url != null)
                 Positioned.fill(
-                  child: Image.network(
-                    url.toString(),
-                    fit: view == CameraView.surround ? BoxFit.contain : BoxFit.cover,
-                    gaplessPlayback: true,
-                    errorBuilder: (context, error, stack) => const CustomPaint(painter: _GuidePainter()),
-                  ),
+                  child: store.showingSaved
+                      ? offline()
+                      : Image.network(
+                          url.toString(),
+                          fit: fit,
+                          gaplessPlayback: true,
+                          errorBuilder: (context, error, stack) => offline(),
+                        ),
                 )
               else if (view == CameraView.surround)
                 const Positioned.fill(

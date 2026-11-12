@@ -19,6 +19,11 @@ class CarState {
 
   bool get hasData => _s.containsKey(E.soc);
 
+  Iterable<EntityState> get entities => _s.values;
+
+  /// The Hyundai integration's core entities exist.
+  bool get hasCar => _s.containsKey(E.soc) || _s.containsKey(E.lock);
+
   String? _str(String id) {
     final v = _s[id]?.state;
     return (v == null || v == 'unknown' || v == 'unavailable') ? null : v;
@@ -26,6 +31,25 @@ class CarState {
 
   double? _num(String id) => double.tryParse(_str(id) ?? '');
   bool _on(String id) => _str(id) == 'on';
+
+  /// On, off, or null when Home Assistant doesn't know.
+  bool? _flag(String id) => switch (_str(id)) {
+    null => null,
+    final v => v == 'on',
+  };
+
+  /// True when all are known off, false when any is on, else null.
+  bool? _noneOn(Iterable<String> ids) {
+    final flags = ids.map(_flag);
+    if (flags.contains(true)) return false;
+    return flags.contains(null) ? null : true;
+  }
+
+  static bool? _all(Iterable<bool?> parts) {
+    if (parts.contains(false)) return false;
+    return parts.contains(null) ? null : true;
+  }
+
   Map<String, dynamic> _attrs(String id) => _s[id]?.attributes ?? const {};
 
   DoorLock get lock => switch (_str(E.lock)) {
@@ -43,7 +67,7 @@ class CarState {
   int? get odometerKm => _num(E.odometer)?.round();
   int? get twelveVoltPct => _num(E.twelveVolt)?.round();
   int? get nextServiceKm => _num(E.nextService)?.round();
-  int get dtcCount => _num(E.dtcCount)?.round() ?? 0;
+  int? get dtcCount => _num(E.dtcCount)?.round();
   DateTime? get lastUpdated => DateTime.tryParse(_str(E.lastUpdated) ?? '')?.toLocal();
 
   bool get charging => _on(E.charging);
@@ -52,8 +76,8 @@ class CarState {
   int? get chargeMinutesLeft => _num(E.chargeMinutes)?.round();
   int? get fastChargeMinutes => _num(E.fastChargeMinutes)?.round();
   int? get stationChargeMinutes => _num(E.stationChargeMinutes)?.round();
-  int get acLimit => _num(E.acLimit)?.round() ?? 90;
-  int get dcLimit => _num(E.dcLimit)?.round() ?? 90;
+  int? get acLimit => _num(E.acLimit)?.round();
+  int? get dcLimit => _num(E.dcLimit)?.round();
 
   /// Whether the home charger's last or current session is this car.
   bool get onHomeCharger => _str(E.chargerVehicle) == 'ioniq_6';
@@ -83,23 +107,28 @@ class CarState {
   bool get wheelHeatOn => _on(E.wheelHeat);
 
   bool get engineOn => _on(E.engine);
-  bool get hoodOpen => _on(E.hood);
-  bool get trunkOpen => _on(E.trunk);
+  bool? get hoodOpen => _flag(E.hood);
+  bool? get trunkOpen => _flag(E.trunk);
   List<String> get openDoors => [
     for (final MapEntry(:key, :value) in E.doors.entries)
       if (_on(value)) key,
   ];
-  bool get allClosed => openDoors.isEmpty && !hoodOpen && !trunkOpen;
+
+  /// Null when a door's state isn't known.
+  bool? get doorsClosed => _noneOn(E.doors.values);
+  bool? get allClosed => _noneOn([...E.doors.values, E.hood, E.trunk]);
 
   Map<String, bool> get tireWarnings => {for (final MapEntry(:key, :value) in E.tires.entries) key: _on(value)};
-  bool get tiresOk => !_on(E.tiresAll) && !tireWarnings.containsValue(true);
-  bool get lampsOk => !E.lampFaults.any(_on);
-  bool get brakeFluidOk => !_on(E.brakeFluid);
-  bool get washerFluidOk => !_on(E.washerFluid);
-  bool get healthOk => tiresOk && lampsOk && brakeFluidOk && washerFluidOk && dtcCount == 0;
+  // Each is null when Home Assistant doesn't know, so a broken integration
+  // never reads as a healthy car.
+  bool? get tiresOk => _noneOn([E.tiresAll, ...E.tires.values]);
+  bool? get lampsOk => _noneOn(E.lampFaults);
+  bool? get brakeFluidOk => _noneOn([E.brakeFluid]);
+  bool? get washerFluidOk => _noneOn([E.washerFluid]);
+  bool? get healthOk => _all([tiresOk, lampsOk, brakeFluidOk, washerFluidOk, dtcCount == null ? null : dtcCount == 0]);
 
   bool get phoneConnected => _on(E.phoneConnected);
-  bool get walkAwayDryRun => _str(E.walkAwayDryRun) != 'off';
+  bool? get walkAwayDryRun => _flag(E.walkAwayDryRun);
 
   /// Where the car is: the add-on's parked fix when it has one, else the
   /// integration's (which it rarely fetches).
@@ -163,4 +192,6 @@ class CarState {
   }
 
   CarState withEntity(EntityState e) => CarState({..._s, e.entityId: e});
+
+  CarState withEntities(Iterable<EntityState> changed) => CarState({..._s, for (final e in changed) e.entityId: e});
 }

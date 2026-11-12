@@ -42,7 +42,7 @@ class HomeScreen extends StatelessWidget {
                               height: 6,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: store.connection == Connection.live || store.isDemo ? Palette.ok : Palette.amber,
+                                color: store.health.ok ? Palette.ok : Palette.amber,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -61,9 +61,14 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              if (store.connection == Connection.error) ...[
+              if (store.health.title != null) ...[
                 const SizedBox(height: 10),
-                _Banner('Can\'t reach Home Assistant. Retrying.', detail: store.error),
+                _Banner(
+                  store.health.title!,
+                  detail: store.showingSaved && store.dataAt != null
+                      ? 'Showing what the car reported ${ago(store.dataAt)}. ${store.health.advice}'
+                      : store.health.advice,
+                ),
               ],
               if (store.isDemo) ...[
                 const SizedBox(height: 10),
@@ -94,7 +99,7 @@ class HomeScreen extends StatelessWidget {
                     NavRow(
                       glyph: const LineIcon(Glyphs.car),
                       label: 'Controls',
-                      value: car.allClosed ? _lockWord(store.lockState) : 'Something is open',
+                      value: car.allClosed == false ? 'Something is open' : _lockWord(store.lockState),
                       onTap: () => Navigator.pushNamed(context, '/controls'),
                     ),
                     NavRow(
@@ -110,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                       label: 'Charging',
                       value: car.charging
                           ? 'Charging · ${duration(car.chargeMinutesLeft ?? 0)} left'
-                          : '${car.plugged ? 'Plugged in' : 'Unplugged'} · limit ${car.acLimit}%',
+                          : '${car.plugged ? 'Plugged in' : 'Unplugged'} · limit ${car.acLimit ?? '–'}%',
                       onTap: () => Navigator.pushNamed(context, '/charging'),
                     ),
                     NavRow(
@@ -122,7 +127,11 @@ class HomeScreen extends StatelessWidget {
                     NavRow(
                       glyph: const LineIcon(Glyphs.heart),
                       label: 'Health',
-                      value: car.healthOk ? 'All good' : 'Needs a look',
+                      value: switch (car.healthOk) {
+                        null => 'Unknown',
+                        true => 'All good',
+                        false => 'Needs a look',
+                      },
                       onTap: () => Navigator.pushNamed(context, '/health'),
                     ),
                     NavRow(
@@ -145,7 +154,7 @@ class HomeScreen extends StatelessWidget {
                 child: Text(
                   car.lastUpdated == null
                       ? 'Waiting for Home Assistant'
-                      : 'Car reported ${ago(car.lastUpdated)} · via Home Assistant',
+                      : 'Car reported ${ago(car.lastUpdated)} · via ${store.health.direct ? 'Bluelink directly' : 'Home Assistant'}',
                   style: Txt.muted(13),
                 ),
               ),
@@ -190,7 +199,7 @@ class _Banner extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(text, style: Txt.body(15, color: Palette.ink)),
-        if (detail != null) Text(detail!, style: Txt.muted(14), maxLines: 2, overflow: TextOverflow.ellipsis),
+        if (detail != null) Text(detail!, style: Txt.muted(14), maxLines: 3, overflow: TextOverflow.ellipsis),
       ],
     ),
   );

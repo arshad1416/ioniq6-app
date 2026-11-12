@@ -184,18 +184,27 @@ class HealthScreen extends StatelessWidget {
           spacing: 6,
           runSpacing: 6,
           children: [
-            StatusChip(car.tiresOk ? 'Tires ok' : 'Check tire pressure', ok: car.tiresOk),
-            StatusChip(car.lampsOk ? 'Lamps ok' : 'Lamp fault', ok: car.lampsOk),
-            StatusChip(car.brakeFluidOk ? 'Brake fluid ok' : 'Brake fluid low', ok: car.brakeFluidOk),
-            StatusChip(car.washerFluidOk ? 'Washer fluid ok' : 'Washer fluid low', ok: car.washerFluidOk),
-            StatusChip('${car.dtcCount} fault codes', ok: car.dtcCount == 0),
+            StatusChip.known(car.tiresOk, what: 'Tires', good: 'Tires ok', bad: 'Check tire pressure'),
+            StatusChip.known(car.lampsOk, what: 'Lamps', good: 'Lamps ok', bad: 'Lamp fault'),
+            StatusChip.known(car.brakeFluidOk, what: 'Brake fluid', good: 'Brake fluid ok', bad: 'Brake fluid low'),
+            StatusChip.known(car.washerFluidOk, what: 'Washer fluid', good: 'Washer fluid ok', bad: 'Washer fluid low'),
+            StatusChip.known(
+              car.dtcCount == null ? null : car.dtcCount == 0,
+              what: 'Fault codes',
+              good: '0 fault codes',
+              bad: '${car.dtcCount} fault codes',
+            ),
           ],
         ),
         Panel(
           children: [
             Kv('12 V battery', car.twelveVoltPct == null ? '–' : '${car.twelveVoltPct}%'),
             Kv('High-voltage battery', car.soc == null ? '–' : '${car.soc}%'),
-            Kv('Doors, hood, trunk', car.allClosed ? 'Closed' : 'Open'),
+            Kv('Doors, hood, trunk', switch (car.allClosed) {
+              null => 'Unknown',
+              true => 'Closed',
+              false => 'Open',
+            }),
             // Bluelink's service schedule can lag the odometer, so show it as reported.
             if (car.nextServiceKm != null)
               Kv('Next service (Bluelink)', 'at ${thousands(units.dist(car.nextServiceKm))} ${units.distance}'),

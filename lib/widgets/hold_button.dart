@@ -81,10 +81,17 @@ Future<void> runCommand(BuildContext context, CarCommand cmd) async {
     messenger.showSnackBar(SnackBar(content: Text('${cmd.label}: not confirmed, nothing sent')));
     return;
   }
+  final direct = store.usingDirect;
   try {
     await store.send(cmd);
     messenger.showSnackBar(
-      SnackBar(content: Text(store.isDemo ? '${cmd.label}: demo, nothing sent' : '${cmd.label}: sent')),
+      SnackBar(
+        content: Text(
+          store.isDemo
+              ? '${cmd.label}: demo, nothing sent'
+              : (direct ? '${cmd.label}: sent straight to Bluelink' : '${cmd.label}: sent'),
+        ),
+      ),
     );
   } on CommandsDisabled catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('$e')));

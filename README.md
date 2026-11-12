@@ -1,8 +1,9 @@
 # Ioniq 6 Companion
 
-An Android app (Flutter) for a 2023 Hyundai Ioniq 6. It talks only to Home
-Assistant, which already runs the Hyundai/Kia (`kia_uvo`) integration. The app
-never logs in to Bluelink itself, so there is only one Bluelink session.
+An Android app (Flutter) for a 2023 Hyundai Ioniq 6. It talks to Home
+Assistant, which already runs the Hyundai/Kia (`kia_uvo`) integration. As an
+optional fallback it can sign in to Bluelink itself, and uses that only while
+Home Assistant can't reach the car.
 
 ![Screens](docs/screens.png)
 
@@ -22,6 +23,33 @@ never logs in to Bluelink itself, so there is only one Bluelink session.
 - **Car commands are off** until you turn them on in Settings. Until then the app is read-only.
 - **Demo mode** shows a snapshot of the car and sends nothing anywhere. It's on until
   Home Assistant is set up.
+
+## When Home Assistant or the Hyundai integration is down
+
+- The app keeps the car's **last known state** and the last 360 shots on the phone and
+  shows them, with their age, until Home Assistant answers again.
+- A banner on Home says **which link is broken**: no internet, Home Assistant unreachable,
+  token rejected, Hyundai integration missing, or the integration not getting data from Bluelink.
+- Values the app can't know show as **Unknown**, never as OK.
+- Commands are refused straight away, with the reason, while the path to the car is broken.
+- The car's device and entities are **looked up at each connect**, so removing and re-adding
+  the Hyundai integration needs no new build.
+- An optional **address on home Wi-Fi** is tried first, so the app works at home without the internet.
+
+### Bluelink fallback (optional)
+
+Sign in under Settings, Bluelink fallback, with your Bluelink email, password and PIN
+(a new phone is confirmed once with an emailed code). They stay in the phone's secure storage.
+
+- The app talks to Bluelink only after Home Assistant has failed twice in a row, or when
+  Home Assistant is up but its Hyundai integration is missing or has no data. It never polls:
+  it reads the car's last reported status when the app opens or you refresh.
+- Lock, unlock, climate, charging, charge limits, valet, battery warming and Find My Car work
+  this way. Flash, honk, the charge port and new 360 shots still need Home Assistant.
+- The switch is automatic. A banner on Home says "Switched to Bluelink directly" with the reason,
+  the status line reads "via Bluelink directly", and each command confirms "sent straight to Bluelink".
+- Home Assistant's own extras (home charger rate and cost, walk-away lock, activity history)
+  show their last saved values.
 
 ## Setup
 

@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../car/car_store.dart';
+import '../car/charge_schedule.dart';
 import '../car/settings.dart';
 import '../security/biometrics.dart';
 import '../theme.dart';
@@ -108,6 +109,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _soonRow(LineGlyph glyph, String label, {String? sub}) =>
       NavRow(glyph: LineIcon(glyph), label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
 
+  Widget _offPeakRow(ChargeSchedule? schedule) => NavRow(
+    glyph: const LineIcon(Glyphs.bolt),
+    label: 'Off-peak charging',
+    sub: switch (schedule?.mode) {
+      null => 'The car hasn\'t reported its schedule',
+      OffPeakMode.off => 'Charges whenever plugged in',
+      OffPeakMode.prefer => 'Prefers off-peak hours',
+      OffPeakMode.only => 'Only charges off-peak',
+    },
+    value: switch (schedule) {
+      null => 'Unknown',
+      ChargeSchedule(mode: OffPeakMode.off) => 'Off',
+      final s => s.window,
+    },
+    onTap: schedule == null ? null : () => _showSchedule(schedule),
+  );
+
+  Future<void> _showSchedule(ChargeSchedule s) => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Palette.raise,
+    builder: (context) {
+      Widget line(String label, String value) => ListTile(
+        title: Text(label, style: Txt.body(16)),
+        trailing: Text(value, style: Txt.muted(16)),
+      );
+      String departure(Departure d) {
+        if (!d.enabled) return 'Off';
+        final temp = d.tempC == null ? '' : ' ${d.tempC!.toStringAsFixed(d.tempC! % 1 == 0 ? 0 : 1)}°C';
+        return '${daySummary(d.days)} ${clock(d.minutes)}${d.climateOn ? ' · climate$temp' : ''}';
+      }
+
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Charge schedule', style: Txt.display(22, weight: 400)),
+            ),
+            line('Off-peak', switch (s.mode) {
+              OffPeakMode.off => 'Not used',
+              OffPeakMode.prefer => 'Preferred',
+              OffPeakMode.only => 'Only',
+            }),
+            line('Window', s.window),
+            line('Charge for departures', s.scheduledCharging ? 'On' : 'Off'),
+            for (final (i, d) in s.departures.indexed) line('Departure ${i + 1}', departure(d)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Text('Changing the schedule from the app is coming next.', style: Txt.muted(14)),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
   Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
     title: Text(title, style: Txt.body(16)),
     subtitle: Text(sub, style: Txt.muted(14)),
@@ -168,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               sub: 'OnePlus 13 Bluetooth to IONIQ 6',
               value: car.phoneConnected ? 'Connected' : 'Not connected',
             ),
-            _soonRow(Glyphs.bolt, 'Off-peak charging', sub: 'Ontario ULO window, 23:00–07:00'),
+            _offPeakRow(car.chargeSchedule),
             const NavRow(glyph: LineIcon(Glyphs.brush), label: 'Car colour', value: 'Ultimate Red'),
             _switch(
               'Car commands',

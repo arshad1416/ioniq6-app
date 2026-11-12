@@ -19,6 +19,11 @@ class CarState {
 
   bool get hasData => _s.containsKey(E.soc);
 
+  Iterable<EntityState> get entities => _s.values;
+
+  /// The Hyundai integration's core entities exist.
+  bool get hasCar => _s.containsKey(E.soc) || _s.containsKey(E.lock);
+
   String? _str(String id) {
     final v = _s[id]?.state;
     return (v == null || v == 'unknown' || v == 'unavailable') ? null : v;
@@ -163,4 +168,6 @@ class CarState {
   }
 
   CarState withEntity(EntityState e) => CarState({..._s, e.entityId: e});
+
+  CarState withEntities(Iterable<EntityState> changed) => CarState({..._s, for (final e in changed) e.entityId: e});
 }

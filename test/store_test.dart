@@ -16,13 +16,27 @@ class FakeHa extends HaClient {
   FakeHa() : super(baseUrl: Uri.parse('http://ha.test:8123'), token: 't');
 
   final calls = <(String, String, Map<String, dynamic>)>[];
-  final updates = StreamController<EntityState>();
+  final updates = StreamController<List<EntityState>>();
+  List<Map<String, dynamic>> registry = [
+    for (final id in E.all) {'entity_id': id, 'unique_id': 'u-$id', 'platform': 'kia_uvo', 'device_id': E.deviceId},
+  ];
+  List<String> subscribed = [];
+  Object? pingError;
 
   @override
-  Future<List<EntityState>> states(Iterable<String> ids) async => demoStates().values.toList();
+  Future<List<Map<String, dynamic>>> entityRegistry() async => registry;
 
   @override
-  Stream<EntityState> subscribe(List<String> ids) => updates.stream;
+  Stream<List<EntityState>> subscribe(List<String> ids) {
+    subscribed = ids;
+    updates.add(demoStates().values.toList());
+    return updates.stream;
+  }
+
+  @override
+  Future<void> ping() async {
+    if (pingError != null) throw pingError!;
+  }
 
   @override
   Future<void> callService(String domain, String service, Map<String, dynamic> data) async =>
@@ -77,7 +91,7 @@ void main() {
     expect(fake.calls.single.$3['device_id'], E.deviceId);
     expect(store.lockState, DoorLock.unlocking);
 
-    fake.updates.add(demoStates()[E.lock]!.copyWith(state: 'unlocked'));
+    fake.updates.add([demoStates()[E.lock]!.copyWith(state: 'unlocked')]);
     await Future<void>.delayed(Duration.zero);
     expect(store.pending, isNull);
     expect(store.lockState, DoorLock.unlocked);

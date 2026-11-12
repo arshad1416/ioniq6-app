@@ -12,15 +12,23 @@ class EntityState {
   final Map<String, dynamic> attributes;
   final DateTime lastChanged;
 
-  factory EntityState.fromRest(Map<String, dynamic> j) => EntityState(
-    j['entity_id'] as String,
-    '${j['state']}',
-    Map<String, dynamic>.from(j['attributes'] as Map? ?? const {}),
-    DateTime.tryParse('${j['last_changed']}')?.toLocal() ?? DateTime.now(),
+  /// For the saved snapshot on the phone.
+  factory EntityState.fromJson(Map<String, dynamic> j) => EntityState(
+    j['id'] as String,
+    j['s'] as String,
+    Map<String, dynamic>.from(j['a'] as Map? ?? const {}),
+    DateTime.fromMillisecondsSinceEpoch(j['lc'] as int),
   );
 
-  EntityState copyWith({String? state, Map<String, dynamic>? attributes, DateTime? lastChanged}) =>
-      EntityState(entityId, state ?? this.state, attributes ?? this.attributes, lastChanged ?? this.lastChanged);
+  Map<String, dynamic> toJson() => {'id': entityId, 's': state, 'a': attributes, 'lc': lastChanged.millisecondsSinceEpoch};
+
+  EntityState copyWith({String? entityId, String? state, Map<String, dynamic>? attributes, DateTime? lastChanged}) =>
+      EntityState(
+        entityId ?? this.entityId,
+        state ?? this.state,
+        attributes ?? this.attributes,
+        lastChanged ?? this.lastChanged,
+      );
 }
 
 class HaException implements Exception {
@@ -30,8 +38,13 @@ class HaException implements Exception {
   String toString() => message;
 }
 
-/// Talks to Home Assistant: REST for one-off reads and service calls,
-/// WebSocket (`subscribe_entities`) for live state.
+/// The token is wrong or revoked; retrying won't help.
+class HaAuthException extends HaException {
+  HaAuthException() : super('Home Assistant rejected the token');
+}
+
+/// Talks to Home Assistant: the WebSocket for live state (`subscribe_entities`),
+/// service calls and the registries; REST for history and the setup check.
 class HaClient {
   HaClient({required this.baseUrl, required this.token, http.Client? httpClient}) : _http = httpClient ?? http.Client();
 
@@ -42,7 +55,12 @@ class HaClient {
   WebSocketChannel? _ws;
   StreamSubscription? _wsSub;
   int _nextId = 1;
-  final _pending = <int, Completer<Map<String, dynamic>>>{};
+  final _pending = <int, Completer<dynamic>>{};
+  Timer? _heartbeat;
+
+  /// How often the open socket is checked, and how long it has to answer.
+  static const heartbeatEvery = Duration(seconds: 30);
+  static const _pongWithin = Duration(seconds: 10);
 
   Map<String, String> get _headers => {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'};
 
@@ -51,22 +69,22 @@ class HaClient {
 
   Future<dynamic> _get(String path, [Map<String, String>? query]) async {
     final r = await _http.get(_api(path, query), headers: _headers).timeout(const Duration(seconds: 15));
-    if (r.statusCode == 401) throw HaException('Home Assistant rejected the token');
+    if (r.statusCode == 401) throw HaAuthException();
     if (r.statusCode != 200) throw HaException('Home Assistant answered ${r.statusCode} for $path');
     return jsonDecode(r.body);
   }
 
   /// Confirms the URL and token work.
-  Future<void> ping() async => _get('');
+  Future<void> verify() async => _get('');
 
-  Future<List<EntityState>> states(Iterable<String> ids) async {
-    final wanted = ids.toSet();
-    final all = await _get('states') as List;
-    return [
-      for (final j in all.cast<Map<String, dynamic>>())
-        if (wanted.contains(j['entity_id'])) EntityState.fromRest(j),
-    ];
-  }
+  /// Checks the open socket still answers; a phone can keep a dead one open
+  /// after it switches networks.
+  Future<void> ping() async => _send({'type': 'ping'}, timeout: _pongWithin);
+
+  /// Every entity Home Assistant knows: `entity_id`, `unique_id`, `platform`
+  /// (the integration) and `device_id`.
+  Future<List<Map<String, dynamic>>> entityRegistry() async =>
+      ((await _send({'type': 'config/entity_registry/list'})) as List).cast<Map<String, dynamic>>();
 
   /// Over the WebSocket, because REST turns a service's own error into a bare
   /// "500 Internal Server Error"; this way the add-on's reason reaches the user.
@@ -114,12 +132,13 @@ class HaClient {
       'period': period,
       'types': ['change', 'state'],
     });
-    return ((r[id] as List?) ?? const []).cast<Map<String, dynamic>>();
+    return (((r as Map)[id] as List?) ?? const []).cast<Map<String, dynamic>>();
   }
 
-  /// Opens the WebSocket and streams entity updates for [ids].
-  Stream<EntityState> subscribe(List<String> ids) {
-    final out = StreamController<EntityState>();
+  /// Opens the WebSocket and streams entity updates for [ids] in batches.
+  /// The first batch is the current state of every entity that exists.
+  Stream<List<EntityState>> subscribe(List<String> ids) {
+    final out = StreamController<List<EntityState>>();
     final known = <String, EntityState>{};
 
     out.onListen = () async {
@@ -127,10 +146,9 @@ class HaClient {
         await _connect(out);
         final sub = _nextId++;
         _subscriptions[sub] = (Map<String, dynamic> event) {
+          final batch = <EntityState>[];
           for (final MapEntry(:key, :value) in ((event['a'] as Map?) ?? const {}).entries) {
-            final s = _fromCompressed(key as String, value as Map);
-            known[key] = s;
-            out.add(s);
+            batch.add(known[key as String] = _fromCompressed(key, value as Map));
           }
           for (final MapEntry(:key, :value) in ((event['c'] as Map?) ?? const {}).entries) {
             final prev = known[key];
@@ -142,16 +160,30 @@ class HaClient {
             for (final k in (minus?['a'] as List?) ?? const []) {
               attrs.remove(k);
             }
-            final s = prev.copyWith(
-              state: plus?['s'] == null ? null : '${plus!['s']}',
-              attributes: attrs,
-              lastChanged: plus?['lc'] == null ? null : _epoch(plus!['lc']),
+            batch.add(
+              known[key as String] = prev.copyWith(
+                state: plus?['s'] == null ? null : '${plus!['s']}',
+                attributes: attrs,
+                lastChanged: plus?['lc'] == null ? null : _epoch(plus!['lc']),
+              ),
             );
-            known[key] = s;
-            out.add(s);
           }
+          for (final key in (event['r'] as List?) ?? const []) {
+            final gone = known.remove(key);
+            if (gone != null) batch.add(gone.copyWith(state: 'unavailable'));
+          }
+          out.add(batch);
         };
         _ws!.sink.add(jsonEncode({'id': sub, 'type': 'subscribe_entities', 'entity_ids': ids}));
+        _heartbeat = Timer.periodic(heartbeatEvery, (_) async {
+          try {
+            await ping();
+          } catch (_) {
+            if (out.isClosed) return;
+            out.addError(HaException('Home Assistant stopped answering'));
+            await close();
+          }
+        });
       } catch (e, st) {
         out.addError(e, st);
         await out.close();
@@ -172,7 +204,7 @@ class HaClient {
     j['lc'] == null ? DateTime.now() : _epoch(j['lc']),
   );
 
-  Future<void> _connect([StreamController<EntityState>? errors]) async {
+  Future<void> _connect([StreamController<List<EntityState>>? errors]) async {
     if (_ws != null) return;
     final wsUri = baseUrl.replace(
       scheme: baseUrl.scheme == 'https' ? 'wss' : 'ws',
@@ -191,15 +223,16 @@ class HaClient {
           case 'auth_ok':
             authed.complete();
           case 'auth_invalid':
-            authed.completeError(HaException('Home Assistant rejected the token'));
+            authed.completeError(HaAuthException());
           case 'event':
             _subscriptions[msg['id']]?.call(Map<String, dynamic>.from(msg['event'] as Map));
+          case 'pong':
+            _pending.remove(msg['id'])?.complete(null);
           case 'result':
             final c = _pending.remove(msg['id']);
             if (c == null) break;
             if (msg['success'] == true) {
-              final r = msg['result'];
-              c.complete(r is Map ? Map<String, dynamic>.from(r) : <String, dynamic>{});
+              c.complete(msg['result']);
             } else {
               c.completeError(HaException('${(msg['error'] as Map?)?['message'] ?? 'request failed'}'));
             }
@@ -215,22 +248,38 @@ class HaClient {
         _pending.clear();
       },
     );
-    await authed.future.timeout(const Duration(seconds: 15));
+    try {
+      await authed.future.timeout(const Duration(seconds: 15));
+    } catch (_) {
+      await close(); // don't leave a half-open socket for the next call to reuse
+      rethrow;
+    }
   }
 
-  Future<Map<String, dynamic>> _send(Map<String, dynamic> msg, {Duration timeout = const Duration(seconds: 20)}) async {
+  Future<dynamic> _send(Map<String, dynamic> msg, {Duration timeout = const Duration(seconds: 20)}) async {
     await _connect();
     final id = _nextId++;
-    final c = Completer<Map<String, dynamic>>();
+    final c = Completer<dynamic>();
     _pending[id] = c;
     _ws!.sink.add(jsonEncode({...msg, 'id': id}));
-    return c.future.timeout(timeout);
+    return c.future.timeout(
+      timeout,
+      onTimeout: () {
+        _pending.remove(id);
+        throw TimeoutException('Home Assistant took too long to answer');
+      },
+    );
   }
 
   Future<void> close() async {
+    _heartbeat?.cancel();
     await _wsSub?.cancel();
     await _ws?.sink.close();
     _ws = null;
     _subscriptions.clear();
+    for (final c in _pending.values) {
+      c.completeError(HaException('Connection closed'));
+    }
+    _pending.clear();
   }
 }

@@ -1,13 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../ha/entities.dart';
+import '../ha/entity_map.dart';
 import '../ha/ha_client.dart';
 import 'car_state.dart';
 import 'outside_weather.dart';
 import 'commands.dart';
 import 'demo_data.dart';
+import 'health.dart';
 import 'settings.dart';
 
 enum Connection { none, connecting, live, error, demo }
@@ -21,6 +24,14 @@ class ActivityItem {
 class CommandsDisabled implements Exception {
   @override
   String toString() => 'Car commands are off. Turn them on in Settings.';
+}
+
+/// The path to the car is known to be broken, so nothing was sent.
+class PathDown implements Exception {
+  PathDown(this.reason);
+  final String reason;
+  @override
+  String toString() => '$reason. Nothing was sent.';
 }
 
 /// App state: the car as Home Assistant reports it, the connection, and any
@@ -43,16 +54,64 @@ class CarStore extends ChangeNotifier {
   List<ActivityItem> _history = [];
 
   HaClient? _client;
-  StreamSubscription<EntityState>? _sub;
-  Timer? _retry, _pendingTimeout;
+  StreamSubscription<List<EntityState>>? _sub;
+  Timer? _retry, _pendingTimeout, _saveTimer;
   int _failures = 0;
+  Object? _lastError;
+  EntityMap _map = const EntityMap();
+  String? _activeUrl;
+
+  /// Entities Home Assistant has but whose integration isn't providing them.
+  /// Their last good values stay in [car].
+  final _down = <String>{};
+
+  /// When Home Assistant last gave us the car's own data.
+  DateTime? dataAt;
 
   /// Quick, silent retries before the error banner shows. Right after the
   /// phone wakes or switches networks, DNS often fails for a few seconds.
   static const _quietRetries = [Duration(seconds: 2), Duration(seconds: 4), Duration(seconds: 8)];
 
+  /// After those, the wait between tries grows to this.
+  static const _slowestRetry = Duration(seconds: 60);
+
+  /// How long the home-network address gets before the remote one is tried.
+  static const _localWait = Duration(seconds: 4);
+  static const _remoteWait = Duration(seconds: 20);
+
+  /// A parked car reports rarely; past this the app says so.
+  static const staleAfter = Duration(hours: 6);
+
+  static const _snapshotKey = 'carSnapshot';
+
   bool get isDemo => connection == Connection.demo;
   DoorLock get lockState => lockOverride ?? car.lock;
+
+  /// Which link to the car is broken, if any.
+  Health get health {
+    final extrasMissing = connection == Connection.live && !_map.extrasFound;
+    Health at(Link link) => Health(link, detail: error, extrasMissing: extrasMissing);
+    switch (connection) {
+      case Connection.demo:
+        return at(Link.demo);
+      case Connection.none || Connection.connecting:
+        return at(Link.connecting);
+      case Connection.error:
+        if (_lastError is HaAuthException) return at(Link.tokenRejected);
+        final text = '$_lastError';
+        final offline = text.contains('Failed host lookup') || text.contains('Network is unreachable');
+        return at(offline ? Link.noNetwork : Link.haUnreachable);
+      case Connection.live:
+        if (!_map.integrationFound || !car.hasCar) return at(Link.integrationMissing);
+        if (_down.contains(E.soc) && _down.contains(E.lock)) return at(Link.carUnavailable);
+        final reported = car.lastUpdated;
+        if (reported != null && DateTime.now().difference(reported) > staleAfter) return at(Link.stale);
+        return at(Link.ok);
+    }
+  }
+
+  /// Whether the screens show saved data, not what the car says right now.
+  bool get showingSaved => !isDemo && car.hasData && !health.canCommand;
 
   List<ActivityItem> get activity => [..._localLog, ..._history]..sort((a, b) => b.time.compareTo(a.time));
 
@@ -61,11 +120,13 @@ class CarStore extends ChangeNotifier {
     if (settings.demo || !settings.isConfigured) {
       _startDemo();
     } else {
+      await _loadSnapshot();
       await connect();
     }
   }
 
   void _startDemo() {
+    _retry?.cancel();
     _sub?.cancel();
     _client?.close();
     _client = null;
@@ -83,42 +144,142 @@ class CarStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Shows what the car last reported until Home Assistant answers.
+  Future<void> _loadSnapshot() async {
+    try {
+      final raw = await settings.readCache(_snapshotKey);
+      if (raw == null) return;
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      car = CarState({
+        for (final e in (j['states'] as List).cast<Map<String, dynamic>>().map(EntityState.fromJson)) e.entityId: e,
+      });
+      dataAt = DateTime.fromMillisecondsSinceEpoch(j['at'] as int);
+      _map = EntityMap(uniqueIds: Map<String, String>.from(j['uniqueIds'] as Map? ?? const {}));
+      notifyListeners();
+    } catch (_) {
+      // A snapshot from an older version, or a damaged one: start empty.
+    }
+  }
+
+  void _saveSnapshotSoon() {
+    _saveTimer ??= Timer(const Duration(seconds: 3), () {
+      _saveTimer = null;
+      unawaited(
+        settings.writeCache(
+          _snapshotKey,
+          jsonEncode({
+            'at': (dataAt ?? DateTime.now()).millisecondsSinceEpoch,
+            'uniqueIds': _map.uniqueIds,
+            'states': [for (final e in car.entities) e.toJson()],
+          }),
+        ),
+      );
+    });
+  }
+
   Future<void> connect() async {
     _retry?.cancel();
     await _sub?.cancel();
     await _client?.close();
     connection = Connection.connecting;
-    error = null;
     notifyListeners();
-    try {
-      final client = _clientFactory(Uri.parse(settings.haUrl), settings.token);
-      _client = client;
-      var states = {for (final s in await client.states(E.all)) s.entityId: s};
-      car = CarState(states);
-      _sub = client.subscribe(E.all).listen((s) {
-        car = car.withEntity(s);
-        _settlePending();
-        notifyListeners();
-      }, onError: (Object e) => _fail(e));
-      connection = Connection.live;
-      _failures = 0;
-      notifyListeners();
-      unawaited(loadHistory());
-    } catch (e) {
-      _fail(e);
+    final urls = [if (settings.haLocalUrl.isNotEmpty) settings.haLocalUrl, settings.haUrl];
+    for (final (i, url) in urls.indexed) {
+      final last = i == urls.length - 1;
+      try {
+        await _open(url, last ? _remoteWait : _localWait);
+        return;
+      } catch (e) {
+        await _sub?.cancel();
+        await _client?.close();
+        if (last || e is HaAuthException) return _fail(e);
+      }
     }
+  }
+
+  Future<void> _open(String url, Duration wait) async {
+    final client = _clientFactory(Uri.parse(url), settings.token);
+    _client = client;
+    _map = await _resolve(client).timeout(wait);
+    final first = Completer<void>();
+    _sub = client.subscribe(_map.subscribed).listen(
+      (batch) {
+        _merge(batch);
+        if (!first.isCompleted) first.complete();
+      },
+      onError: (Object e) => first.isCompleted ? _fail(e) : first.completeError(e),
+    );
+    await first.future.timeout(wait);
+    _activeUrl = url;
+    connection = Connection.live;
+    error = null;
+    _lastError = null;
+    _failures = 0;
+    notifyListeners();
+    unawaited(loadHistory());
+  }
+
+  /// Finds the car's device and entities in this Home Assistant. A token
+  /// without access to the registry falls back to the ids in [E].
+  Future<EntityMap> _resolve(HaClient client) async {
+    try {
+      return EntityMap.resolve(await client.entityRegistry(), remembered: _map.uniqueIds);
+    } on HaAuthException {
+      rethrow;
+    } on HaException {
+      return EntityMap(uniqueIds: _map.uniqueIds);
+    }
+  }
+
+  void _merge(List<EntityState> batch) {
+    final good = <EntityState>[];
+    for (final actual in batch) {
+      final e = actual.copyWith(entityId: _map.canonical(actual.entityId));
+      if (e.state == 'unavailable') {
+        _down.add(e.entityId);
+        // Keep the last good value on screen; [health] says it's old.
+        if (!car.entities.any((known) => known.entityId == e.entityId)) good.add(e);
+      } else {
+        _down.remove(e.entityId);
+        good.add(e);
+      }
+    }
+    car = car.withEntities(good);
+    if (!(_down.contains(E.soc) && _down.contains(E.lock))) dataAt = DateTime.now();
+    _saveSnapshotSoon();
+    _settlePending();
+    notifyListeners();
   }
 
   void _fail(Object e) {
     _retry?.cancel();
-    if (_failures < _quietRetries.length) {
+    _lastError = e;
+    if (e is! HaAuthException && _failures < _quietRetries.length) {
       _retry = Timer(_quietRetries[_failures++], connect);
       return; // still "connecting"; the last known state stays on screen
     }
     connection = Connection.error;
     error = '$e';
     notifyListeners();
-    _retry = Timer(const Duration(seconds: 20), connect);
+    if (e is HaAuthException) return; // a new token is the only fix
+    final wait = Duration(seconds: 20 * (++_failures - _quietRetries.length));
+    _retry = Timer(wait > _slowestRetry ? _slowestRetry : wait, connect);
+  }
+
+  /// The app came back to the foreground: the socket may have died while the
+  /// phone slept, so check it, or stop waiting and reconnect now.
+  Future<void> onResume() async {
+    if (isDemo || !settings.isConfigured || _lastError is HaAuthException) return;
+    if (connection == Connection.live) {
+      try {
+        await _client!.ping();
+        return;
+      } catch (_) {
+        // fall through to a fresh connection
+      }
+    }
+    _failures = 0;
+    await connect();
   }
 
   Future<void> loadHistory() async {
@@ -179,11 +340,31 @@ class CarStore extends ChangeNotifier {
       if (isDemo) {
         await Future<void>.delayed(const Duration(milliseconds: 1200));
       } else {
-        await _client!.callService('ioniq6_extras', 'locate', {});
+        await _call('ioniq6_extras', 'locate', const {});
       }
     } finally {
       locating = false;
       notifyListeners();
+    }
+  }
+
+  /// Calls a Home Assistant service, refusing early when the path to the car
+  /// is known to be broken and putting failures in plain words.
+  Future<void> _call(String domain, String service, Map<String, dynamic> data) async {
+    final state = health;
+    if (!state.canCommand) throw PathDown(state.title ?? 'Still connecting to Home Assistant');
+    if (domain == EntityMap.extrasPlatform && !_map.extrasFound) {
+      throw PathDown("The Ioniq 6 Extras add-on isn't loaded in Home Assistant");
+    }
+    try {
+      await _client!.callService(domain, service, _map.translate(data));
+    } on TimeoutException {
+      throw HaException("Home Assistant didn't answer in time, so it's unclear whether the car got it");
+    } on HaException catch (e) {
+      if (e.message.contains('not found')) {
+        throw HaException("Home Assistant doesn't have $domain.$service; its integration isn't loaded");
+      }
+      rethrow;
     }
   }
 
@@ -202,7 +383,7 @@ class CarStore extends ChangeNotifier {
         await Future<void>.delayed(const Duration(milliseconds: 1600));
         _applyDemo(cmd);
       } else {
-        await _client!.callService(cmd.domain, cmd.service, cmd.data);
+        await _call(cmd.domain, cmd.service, cmd.data);
         // The integration refreshes after a command; wait for HA to show it.
         _pendingTimeout?.cancel();
         _pendingTimeout = Timer(const Duration(seconds: 90), () => _clearPending());
@@ -297,6 +478,7 @@ class CarStore extends ChangeNotifier {
 
   Future<void> refresh() async {
     if (isDemo) return;
+    _failures = 0;
     await connect();
   }
 
@@ -306,21 +488,26 @@ class CarStore extends ChangeNotifier {
     if (settings.demo || !settings.isConfigured) {
       _startDemo();
     } else {
+      _failures = 0;
       await connect();
     }
   }
 
-  /// Tests a URL and token without changing the live connection.
   /// A full URL on the Home Assistant server, for paths like an image
   /// entity's entity_picture (which carries its own access token).
-  Uri? haUri(String path) => settings.haUrl.isEmpty ? null : Uri.parse(settings.haUrl).resolve(path);
+  Uri? haUri(String path) {
+    final base = _activeUrl ?? settings.haUrl;
+    return base.isEmpty ? null : Uri.parse(base).resolve(path);
+  }
 
-  Future<void> testConnection(String url, String token) => _clientFactory(Uri.parse(url), token).ping();
+  /// Tests a URL and token without changing the live connection.
+  Future<void> testConnection(String url, String token) => _clientFactory(Uri.parse(url), token).verify();
 
   @override
   void dispose() {
     _retry?.cancel();
     _pendingTimeout?.cancel();
+    _saveTimer?.cancel();
     _sub?.cancel();
     _client?.close();
     super.dispose();

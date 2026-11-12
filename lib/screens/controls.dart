@@ -89,12 +89,14 @@ class ControlsScreen extends StatelessWidget {
           spacing: 6,
           runSpacing: 6,
           children: [
-            StatusChip(
-              car.openDoors.isEmpty ? 'Doors closed' : '${car.openDoors.join(', ')} open',
-              ok: car.openDoors.isEmpty,
+            StatusChip.known(
+              car.doorsClosed,
+              what: 'Doors',
+              good: 'Doors closed',
+              bad: '${car.openDoors.join(', ')} open',
             ),
-            StatusChip(car.trunkOpen ? 'Trunk open' : 'Trunk closed', ok: !car.trunkOpen),
-            StatusChip(car.hoodOpen ? 'Hood open' : 'Hood closed', ok: !car.hoodOpen),
+            StatusChip.known(_not(car.trunkOpen), what: 'Trunk', good: 'Trunk closed', bad: 'Trunk open'),
+            StatusChip.known(_not(car.hoodOpen), what: 'Hood', good: 'Hood closed', bad: 'Hood open'),
           ],
         ),
         const _Switches(),
@@ -243,3 +245,5 @@ class _ValetSwitch extends StatelessWidget {
     );
   }
 }
+
+bool? _not(bool? v) => v == null ? null : !v;

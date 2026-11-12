@@ -50,7 +50,7 @@ class PlatformBridge {
     final charging = enabled && car.charging
         ? {
             'soc': car.soc ?? 0,
-            'limit': car.acLimit,
+            'limit': car.acLimit ?? 100,
             'minutesLeft': car.chargeMinutesLeft ?? 0,
             'kw': car.chargeRateKw ?? 0,
           }

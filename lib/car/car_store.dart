@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../ha/entities.dart';
 import '../ha/entity_map.dart';
 import '../ha/ha_client.dart';
+import 'camera_cache.dart';
 import 'car_state.dart';
 import 'outside_weather.dart';
 import 'commands.dart';
@@ -37,12 +38,18 @@ class PathDown implements Exception {
 /// App state: the car as Home Assistant reports it, the connection, and any
 /// command in flight. Screens listen to this and never call HA directly.
 class CarStore extends ChangeNotifier {
-  CarStore(this.settings, {HaClient Function(Uri, String)? clientFactory, OutsideWeather? weather})
-    : _clientFactory = clientFactory ?? ((url, token) => HaClient(baseUrl: url, token: token)),
-      weather = weather ?? OutsideWeather();
+  CarStore(
+    this.settings, {
+    HaClient Function(Uri, String)? clientFactory,
+    OutsideWeather? weather,
+    CameraCache? cameras,
+  }) : _clientFactory = clientFactory ?? ((url, token) => HaClient(baseUrl: url, token: token)),
+       weather = weather ?? OutsideWeather(),
+       cameras = cameras ?? CameraCache();
 
   final Settings settings;
   final OutsideWeather weather;
+  final CameraCache cameras;
   final HaClient Function(Uri, String) _clientFactory;
 
   CarState car = CarState.empty;
@@ -67,6 +74,9 @@ class CarStore extends ChangeNotifier {
 
   /// When Home Assistant last gave us the car's own data.
   DateTime? dataAt;
+
+  /// When the 360 shots saved on the phone were taken.
+  DateTime? _savedShotsAt;
 
   /// Quick, silent retries before the error banner shows. Right after the
   /// phone wakes or switches networks, DNS often fails for a few seconds.
@@ -120,6 +130,7 @@ class CarStore extends ChangeNotifier {
     if (settings.demo || !settings.isConfigured) {
       _startDemo();
     } else {
+      await cameras.init();
       await _loadSnapshot();
       await connect();
     }
@@ -154,6 +165,7 @@ class CarStore extends ChangeNotifier {
         for (final e in (j['states'] as List).cast<Map<String, dynamic>>().map(EntityState.fromJson)) e.entityId: e,
       });
       dataAt = DateTime.fromMillisecondsSinceEpoch(j['at'] as int);
+      _savedShotsAt = car.cameraTakenAt;
       _map = EntityMap(uniqueIds: Map<String, String>.from(j['uniqueIds'] as Map? ?? const {}));
       notifyListeners();
     } catch (_) {
@@ -202,13 +214,10 @@ class CarStore extends ChangeNotifier {
     _client = client;
     _map = await _resolve(client).timeout(wait);
     final first = Completer<void>();
-    _sub = client.subscribe(_map.subscribed).listen(
-      (batch) {
-        _merge(batch);
-        if (!first.isCompleted) first.complete();
-      },
-      onError: (Object e) => first.isCompleted ? _fail(e) : first.completeError(e),
-    );
+    _sub = client.subscribe(_map.subscribed).listen((batch) {
+      _merge(batch);
+      if (!first.isCompleted) first.complete();
+    }, onError: (Object e) => first.isCompleted ? _fail(e) : first.completeError(e));
     await first.future.timeout(wait);
     _activeUrl = url;
     connection = Connection.live;
@@ -247,8 +256,23 @@ class CarStore extends ChangeNotifier {
     car = car.withEntities(good);
     if (!(_down.contains(E.soc) && _down.contains(E.lock))) dataAt = DateTime.now();
     _saveSnapshotSoon();
+    _saveShots();
     _settlePending();
     notifyListeners();
+  }
+
+  /// Copies new 360 shots to the phone.
+  void _saveShots() {
+    final taken = car.cameraTakenAt;
+    if (taken == null || taken == _savedShotsAt) return;
+    _savedShotsAt = taken;
+    final pictures = <String, Uri>{};
+    for (final view in E.cameraViews) {
+      final path = car.cameraPicture(view);
+      final url = path == null ? null : haUri(path);
+      if (url != null) pictures[view] = url;
+    }
+    unawaited(cameras.save(pictures));
   }
 
   void _fail(Object e) {

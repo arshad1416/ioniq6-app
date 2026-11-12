@@ -20,7 +20,12 @@ class EntityState {
     DateTime.fromMillisecondsSinceEpoch(j['lc'] as int),
   );
 
-  Map<String, dynamic> toJson() => {'id': entityId, 's': state, 'a': attributes, 'lc': lastChanged.millisecondsSinceEpoch};
+  Map<String, dynamic> toJson() => {
+    'id': entityId,
+    's': state,
+    'a': attributes,
+    'lc': lastChanged.millisecondsSinceEpoch,
+  };
 
   EntityState copyWith({String? entityId, String? state, Map<String, dynamic>? attributes, DateTime? lastChanged}) =>
       EntityState(

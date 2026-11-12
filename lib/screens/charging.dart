@@ -27,7 +27,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
     final store = AppScope.of(context);
     final car = store.car;
     final soc = car.soc ?? 0;
-    final limit = _draftLimit ?? car.acLimit;
+    final limit = _draftLimit ?? car.acLimit ?? 90;
     final changed = _draftLimit != null && _draftLimit != car.acLimit;
 
     return SubScreen(
@@ -160,7 +160,7 @@ class _ChargingScreenState extends State<ChargingScreen> {
           children: [
             if (car.stationChargeMinutes != null) Kv('Home charger (L2) to limit', duration(car.stationChargeMinutes!)),
             if (car.fastChargeMinutes != null) Kv('Fast charger to limit', duration(car.fastChargeMinutes!)),
-            Kv('DC fast charge limit', '${car.dcLimit}%'),
+            Kv('DC fast charge limit', car.dcLimit == null ? '–' : '${car.dcLimit}%'),
             if (car.sessionKwh != null)
               Kv(
                 car.homeChargerCharging ? 'This session' : 'Last home session',

@@ -23,6 +23,18 @@ never logs in to Bluelink itself, so there is only one Bluelink session.
 - **Demo mode** shows a snapshot of the car and sends nothing anywhere. It's on until
   Home Assistant is set up.
 
+## When Home Assistant or the Hyundai integration is down
+
+- The app keeps the car's **last known state** and the last 360 shots on the phone and
+  shows them, with their age, until Home Assistant answers again.
+- A banner on Home says **which link is broken**: no internet, Home Assistant unreachable,
+  token rejected, Hyundai integration missing, or the integration not getting data from Bluelink.
+- Values the app can't know show as **Unknown**, never as OK.
+- Commands are refused straight away, with the reason, while the path to the car is broken.
+- The car's device and entities are **looked up at each connect**, so removing and re-adding
+  the Hyundai integration needs no new build.
+- An optional **address on home Wi-Fi** is tried first, so the app works at home without the internet.
+
 ## Setup
 
 1. In Home Assistant, open your profile, then Security, and create a long-lived access token.

@@ -20,6 +20,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late final CarStore _store = AppScope.of(context);
   late final _url = TextEditingController(text: _store.settings.haUrl);
+  late final _localUrl = TextEditingController(text: _store.settings.haLocalUrl);
   late final _token = TextEditingController(text: _store.settings.token);
   String? _test;
   bool _busy = false;
@@ -27,6 +28,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _url.dispose();
+    _localUrl.dispose();
     _token.dispose();
     super.dispose();
   }
@@ -36,11 +38,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _busy = true;
       _test = null;
     });
-    final url = _url.text.trim().replaceAll(RegExp(r'/+$'), '');
+    String tidy(TextEditingController c) => c.text.trim().replaceAll(RegExp(r'/+$'), '');
+    final url = tidy(_url);
     try {
       await _store.testConnection(url, _token.text.trim());
       _store.settings
         ..haUrl = url
+        ..haLocalUrl = tidy(_localUrl)
         ..token = _token.text.trim()
         ..demo = false;
       await _store.applySettings();
@@ -151,7 +155,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               glyph: const LineIcon(Glyphs.walk),
               label: 'Walk-away lock',
               sub: '45 s after your phone leaves the car',
-              value: car.walkAwayDryRun ? 'Test only' : 'On',
+              value: switch (car.walkAwayDryRun) {
+                null => 'Unknown',
+                true => 'Test only',
+                false => 'On',
+              },
             ),
             NavRow(
               icon: Icons.bluetooth,
@@ -224,6 +232,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: const InputDecoration(labelText: 'Address', hintText: 'https://pi.tailnet.ts.net:8123'),
         ),
         TextField(
+          controller: _localUrl,
+          keyboardType: TextInputType.url,
+          autocorrect: false,
+          decoration: const InputDecoration(
+            labelText: 'Address on home Wi-Fi (optional)',
+            hintText: 'http://homeassistant.local:8123',
+            helperText: 'Tried first, so the app works at home without the internet.',
+          ),
+        ),
+        TextField(
           controller: _token,
           obscureText: true,
           autocorrect: false,
@@ -235,9 +253,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text(
                 _test ??
                     switch (store.connection) {
-                      Connection.live => 'Connected',
+                      Connection.live => store.health.title ?? 'Connected',
                       Connection.connecting => 'Connecting…',
-                      Connection.error => 'Not connected: ${store.error}',
+                      Connection.error => '${store.health.title}: ${store.error}',
                       Connection.demo => 'Demo mode',
                       Connection.none => 'Not set up',
                     },

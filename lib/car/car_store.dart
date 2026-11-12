@@ -107,10 +107,6 @@ class CarStore extends ChangeNotifier {
   /// Why the last direct read failed, if it did.
   String? directError;
 
-  /// Set once the user has agreed, in this run of the app, to send commands
-  /// straight to Bluelink while Home Assistant is down.
-  bool directCommandsConfirmed = false;
-
   /// Direct reads are spaced at least this far apart unless the user asks.
   static const _directEvery = Duration(minutes: 2);
 

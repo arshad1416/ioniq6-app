@@ -46,7 +46,8 @@ Sign in under Settings, Bluelink fallback, with your Bluelink email, password an
   it reads the car's last reported status when the app opens or you refresh.
 - Lock, unlock, climate, charging, charge limits, valet, battery warming and Find My Car work
   this way. Flash, honk, the charge port and new 360 shots still need Home Assistant.
-- The first command in each run of the app asks before it goes straight to Bluelink.
+- The switch is automatic. A banner on Home says "Switched to Bluelink directly" with the reason,
+  the status line reads "via Bluelink directly", and each command confirms "sent straight to Bluelink".
 - Home Assistant's own extras (home charger rate and cost, walk-away lock, activity history)
   show their last saved values.
 

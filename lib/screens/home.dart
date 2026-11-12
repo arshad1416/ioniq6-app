@@ -154,7 +154,7 @@ class HomeScreen extends StatelessWidget {
                 child: Text(
                   car.lastUpdated == null
                       ? 'Waiting for Home Assistant'
-                      : 'Car reported ${ago(car.lastUpdated)} · via Home Assistant',
+                      : 'Car reported ${ago(car.lastUpdated)} · via ${store.health.direct ? 'Bluelink directly' : 'Home Assistant'}',
                   style: Txt.muted(13),
                 ),
               ),

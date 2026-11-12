@@ -46,7 +46,10 @@ class Health {
   /// Whether a command has any chance of reaching the car.
   bool get canCommand => ok || link == Link.stale || direct;
 
-  String? get title => switch (link) {
+  /// What the screens show: the fallback taking over, or the broken link.
+  String? get title => direct ? 'Switched to Bluelink directly' : _title;
+
+  String? get _title => switch (link) {
     Link.ok || Link.demo || Link.connecting => null,
     Link.noNetwork => 'No internet connection',
     Link.haUnreachable => 'Can\'t reach Home Assistant',
@@ -56,7 +59,8 @@ class Health {
     Link.stale => 'The car hasn\'t reported for a while',
   };
 
-  String? get advice => direct ? 'Using Bluelink directly until it\'s back.' : _advice;
+  String? get advice =>
+      direct ? '${_title ?? 'Home Assistant is still connecting'}. Switching back when it works again.' : _advice;
 
   String? get _advice => switch (link) {
     Link.ok || Link.demo || Link.connecting => null,

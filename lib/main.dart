@@ -13,6 +13,7 @@ import 'screens/emergency.dart';
 import 'screens/home.dart';
 import 'screens/info_screens.dart';
 import 'screens/settings.dart';
+import 'screens/trip.dart';
 import 'screens/valet.dart';
 import 'motion.dart';
 import 'theme.dart';
@@ -74,5 +75,6 @@ class CompanionApp extends StatelessWidget {
     '/camera': (_) => const CameraScreen(),
     '/emergency': (_) => const EmergencyScreen(),
     '/valet': (_) => const ValetScreen(),
+    '/trip': (_) => const TripScreen(),
   };
 }

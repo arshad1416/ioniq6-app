@@ -32,8 +32,37 @@ String _materialIcons() {
   return '$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
 }
 
+/// Example events so the Next trip row and screen show something.
+void mockCalendar() {
+  final today = DateTime.now();
+  int at(int day, int hour, [int minute = 0]) =>
+      DateTime(today.year, today.month, today.day + day, hour, minute).millisecondsSinceEpoch;
+  final events = [
+    {
+      'begin': at(1, 8, 30),
+      'end': at(1, 9, 30),
+      'title': 'Office',
+      'location': '100 Queen St W, Toronto',
+      'calendar': 'Work',
+    },
+    {'begin': at(1, 12), 'end': at(1, 13), 'title': 'Team lunch', 'location': null, 'calendar': 'Work'},
+    {
+      'begin': at(2, 17, 15),
+      'end': at(2, 18),
+      'title': 'Swimming',
+      'location': 'Pan Am Sports Centre',
+      'calendar': 'Family',
+    },
+  ];
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+    const MethodChannel('ioniq6/calendar'),
+    (call) async => call.method == 'events' ? events : true,
+  );
+}
+
 void main() {
   setUpAll(loadFonts);
+  setUp(mockCalendar);
 
   for (final route in [
     '/',
@@ -47,6 +76,7 @@ void main() {
     '/camera',
     '/emergency',
     '/valet',
+    '/trip',
   ]) {
     testWidgets('screenshot $route', (tester) async {
       RiveView.enabled = false;

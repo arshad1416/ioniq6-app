@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../calendar/calendar.dart';
 import '../car/car_store.dart';
 import '../car/settings.dart';
 import '../security/biometrics.dart';
@@ -206,7 +207,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: 'English (Canada)',
               onTap: () => _soon('Français'),
             ),
-            _soonRow(Glyphs.calendar, 'Calendar sync', sub: 'Plans trips and climate from events'),
+            FutureBuilder(
+              future: PhoneCalendar.hasPermission(),
+              builder: (context, allowed) => NavRow(
+                glyph: const LineIcon(Glyphs.calendar),
+                label: 'Calendar sync',
+                sub: 'Trips from your phone calendar',
+                value: allowed.data == true ? 'On' : 'Off',
+                onTap: () async {
+                  await Navigator.pushNamed(context, '/trip');
+                  if (mounted) setState(() {});
+                },
+              ),
+            ),
             _switch(
               'Live Updates',
               'Charging and climate on the lock screen',

@@ -107,6 +107,7 @@ void main() {
     expect(updated.mode, OffPeakMode.only);
     expect(updated.window, '22:00–06:00');
     expect(updated.departures, hasLength(2));
+    expect(ChargeSchedule.tryParse(withOffPeak(sample(), OffPeakMode.off, 0, 0))!.scheduledCharging, isFalse);
   });
 
   test('read from a direct Bluelink status', () {

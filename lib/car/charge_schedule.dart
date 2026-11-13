@@ -185,4 +185,5 @@ Map<String, dynamic> withOffPeak(Map current, OffPeakMode mode, int start, int e
     'offPeakPowerFlag': offPeakFlag(mode),
     'offPeakPowerTime1': {'starttime': bluelinkTime(start), 'endtime': bluelinkTime(end)},
   },
+  'reservFlag': mode == OffPeakMode.off ? 0 : 1,
 };

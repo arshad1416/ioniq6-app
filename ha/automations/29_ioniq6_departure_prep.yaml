@@ -1,0 +1,90 @@
+# Ioniq 6: warm or cool the cabin before calendar events that have a place.
+# Installed by ha/install.sh as /opt/homeassistant/automations/29_ioniq6_departure_prep.yaml.
+#
+# Dry run by default. It only sends climate to the car while the helper
+# input_boolean.ioniq6_departure_prep_live exists AND is on. Until Arshad creates
+# that helper (Settings > Devices & services > Helpers > Toggle, named
+# "Ioniq 6 departure prep live") and turns it on, it only notifies the phone.
+# A missing or unavailable helper counts as dry run, never as live.
+#
+# Calendars come from the Google Calendar integration already in Home Assistant.
+# Add or remove calendar.* entities under `triggers` to change which ones count.
+# It fires 30 minutes before the event starts: a 15-minute climate run that
+# finishes around when you'd leave for a nearby place. Change `offset` to tune.
+
+- id: ioniq6_departure_prep
+  alias: "Ioniq 6: Departure prep"
+  description: >-
+    30 minutes before a timed calendar event with a location, starts climate on the
+    Ioniq 6 if the car is off, not too low on charge and nobody is in it. While
+    "Ioniq 6 departure prep live" is off or missing it only notifies.
+  mode: queued
+  max: 5
+  triggers:
+    - trigger: calendar
+      event: start
+      offset: "-0:30:0"
+      entity_id: calendar.arshad14_gmail_com
+    - trigger: calendar
+      event: start
+      offset: "-0:30:0"
+      entity_id: calendar.work
+  conditions:
+    # Only events with somewhere to drive to, and not all-day events.
+    - condition: template
+      value_template: >-
+        {{ not trigger.calendar_event.all_day
+           and (trigger.calendar_event.location | default('', true) | trim) != '' }}
+    # Not while it's being driven.
+    - condition: state
+      entity_id: binary_sensor.ioniq_6_engine
+      state: "off"
+  actions:
+    - variables:
+        title: "{{ trigger.calendar_event.summary | default('Calendar event', true) }}"
+        place: "{{ trigger.calendar_event.location | trim }}"
+        starts: "{{ as_timestamp(trigger.calendar_event.start) | timestamp_custom('%-I:%M %p') }}"
+        soc: "{{ states('sensor.ioniq_6_ev_battery_level') | int(0) }}"
+        live: "{{ is_state('input_boolean.ioniq6_departure_prep_live', 'on') }}"
+        # Opens Google Maps straight into driving navigation (shows on the car via Android Auto).
+        maps: >-
+          {{ 'https://www.google.com/maps/dir/?api=1&travelmode=driving&dir_action=navigate&destination='
+             ~ (place | urlencode) }}
+    - if:
+        - condition: template
+          value_template: "{{ soc < 20 }}"
+      then:
+        - action: notify.mobile_app_cph2655
+          data:
+            title: Departure prep skipped
+            message: >-
+              {{ title }} at {{ starts }}: the battery is at {{ soc }}%, so climate wasn't started.
+        - stop: Battery too low
+    - if:
+        - condition: template
+          value_template: "{{ not live }}"
+      then:
+        - action: notify.mobile_app_cph2655
+          data:
+            title: Departure prep (dry run)
+            message: >-
+              {{ title }} at {{ starts }} ({{ place }}). The Ioniq 6 would start climate
+              now for 15 minutes (test only, nothing sent).
+            data:
+              clickAction: "{{ maps }}"
+        - stop: Dry run
+    - action: kia_uvo.start_climate
+      data:
+        device_id: "{{ device_id('lock.ioniq_6_door_lock') }}"
+        climate: true
+        temperature: 21
+        defrost: false
+        duration: 15
+    - action: notify.mobile_app_cph2655
+      data:
+        title: Departure prep
+        message: >-
+          Started climate on your Ioniq 6 for {{ title }} at {{ starts }} ({{ place }}).
+          Tap to navigate.
+        data:
+          clickAction: "{{ maps }}"

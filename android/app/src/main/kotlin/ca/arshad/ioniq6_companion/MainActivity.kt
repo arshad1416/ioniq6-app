@@ -8,6 +8,8 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
+    private var pendingCalendarAsk: MethodChannel.Result? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val live = LiveUpdates(applicationContext)
@@ -48,6 +50,46 @@ class MainActivity : FlutterFragmentActivity() {
                 result.error("install", e.message, null)
             }
         }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "ioniq6/calendar").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "hasPermission" -> result.success(canReadCalendar())
+                "requestPermission" -> when {
+                    canReadCalendar() -> result.success(true)
+                    pendingCalendarAsk != null -> result.success(false)
+                    else -> {
+                        pendingCalendarAsk = result
+                        requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), CALENDAR_REQUEST)
+                    }
+                }
+                "events" -> {
+                    if (!canReadCalendar()) return@setMethodCallHandler result.error("permission", "No calendar access", null)
+                    val from = call.argument<Number>("from")!!.toLong()
+                    val to = call.argument<Number>("to")!!.toLong()
+                    Thread {
+                        val reply = try {
+                            Result.success(CalendarReader.events(applicationContext, from, to))
+                        } catch (e: Exception) {
+                            Result.failure(e)
+                        }
+                        runOnUiThread {
+                            reply.fold({ result.success(it) }, { result.error("calendar", it.message, null) })
+                        }
+                    }.start()
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun canReadCalendar() =
+        checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+    @Deprecated("Deprecated in Java")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != CALENDAR_REQUEST) return
+        pendingCalendarAsk?.success(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+        pendingCalendarAsk = null
     }
 
     private fun askForNotifications() {
@@ -56,5 +98,9 @@ class MainActivity : FlutterFragmentActivity() {
         ) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
+    }
+
+    private companion object {
+        const val CALENDAR_REQUEST = 7
     }
 }

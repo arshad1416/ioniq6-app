@@ -9,6 +9,7 @@ import '../widgets/climate_icon.dart';
 import '../widgets/common.dart';
 import '../widgets/hold_button.dart';
 import '../widgets/line_icon.dart';
+import 'trip.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -102,6 +103,7 @@ class HomeScreen extends StatelessWidget {
                       value: car.allClosed == false ? 'Something is open' : _lockWord(store.lockState),
                       onTap: () => Navigator.pushNamed(context, '/controls'),
                     ),
+                    const NextTripRow(),
                     NavRow(
                       glyph: const ClimateIcon(),
                       label: 'Climate',

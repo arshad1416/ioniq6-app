@@ -6,6 +6,7 @@ Everything the phone app needs on the Home Assistant side lives here.
 | --- | --- |
 | `automations/27_ioniq6_walkaway_lock.yaml` | Walk-away lock (dry run until you switch it off). |
 | `automations/28_ioniq6_locate_on_park.yaml` | Asks the car where it's parked when your phone leaves it. |
+| `automations/29_ioniq6_departure_prep.yaml` | Departure prep: 30 min before a timed Google Calendar event with a location, starts 15 min of climate. Dry run (notify only) unless the toggle helper `input_boolean.ioniq6_departure_prep_live` exists and is on. |
 | `custom_components/ioniq6_extras/` | The "Ioniq 6 Extras" add-on: parked location, valet mode, battery warming, the 360 camera and the off-peak charging window. |
 | `install.sh` | Copies all of it into `/opt/homeassistant`, backing up whatever it replaces. |
 

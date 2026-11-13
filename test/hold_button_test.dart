@@ -3,6 +3,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ioniq6_companion/widgets/hold_button.dart';
 
 void main() {
+  testWidgets('minor finger jitter still permits intentional hold', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: HoldButton(
+      onHeld: () => calls++, builder: (_, _) => const SizedBox(width: 200, height: 200, child: Center(child: Text('Hold'))),
+    )))));
+    final gesture = await tester.startGesture(tester.getCenter(find.text('Hold')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await gesture.moveBy(const Offset(2, 2));
+    await tester.pump(const Duration(seconds: 1));
+    await gesture.up();
+    expect(calls, 1);
+  });
+  testWidgets('dragging within a hold control cancels after touch slop', (tester) async {
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: HoldButton(
+      onHeld: () => calls++, builder: (_, _) => const SizedBox(width: 200, height: 200, child: Center(child: Text('Hold'))),
+    )))));
+    final gesture = await tester.startGesture(tester.getCenter(find.text('Hold')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await gesture.moveBy(const Offset(0, 30));
+    await tester.pump(const Duration(seconds: 1));
+    await gesture.up();
+    expect(calls, 0);
+  });
   testWidgets('dragging out of a hold control cancels it', (tester) async {
     var calls = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: HoldButton(

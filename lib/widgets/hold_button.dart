@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../car/car_store.dart';
@@ -29,6 +30,7 @@ class HoldButton extends StatefulWidget {
 
 class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateMixin {
   int? _pointer;
+  Offset? _downPosition;
 
   late final AnimationController _c = AnimationController(vsync: this, duration: widget.holdFor)
     ..addStatusListener((s) {
@@ -46,6 +48,7 @@ class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateM
   void _down(PointerDownEvent event) {
     if (!widget.enabled || _pointer != null) return;
     _pointer = event.pointer;
+    _downPosition = event.position;
     HapticFeedback.selectionClick();
     _c.forward(from: 0);
   }
@@ -64,7 +67,10 @@ class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateM
   void _move(PointerMoveEvent event) {
     if (_pointer != event.pointer) return;
     final box = context.findRenderObject() as RenderBox?;
-    if (box != null && !(Offset.zero & box.size).contains(event.localPosition)) {
+    // Raw pointer listeners do not lose to a parent scroll recognizer. Cancel
+    // meaningful motion even inside the button so scrolling never confirms it.
+    final moved = _downPosition != null && (event.position - _downPosition!).distance > kTouchSlop;
+    if (moved || (box != null && !(Offset.zero & box.size).contains(event.localPosition))) {
       _pointer = null;
       _c.reset();
     }

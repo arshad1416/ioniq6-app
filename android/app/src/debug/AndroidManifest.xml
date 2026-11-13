@@ -4,5 +4,5 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <application android:label="IONIQ 6 QA" tools:replace="android:label" />
+    <application android:label="${debugAppLabel}" tools:replace="android:label" />
 </manifest>

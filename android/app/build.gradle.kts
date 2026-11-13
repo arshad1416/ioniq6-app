@@ -54,8 +54,12 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".qa"
-            versionNameSuffix = "-qa"
+            val isolatedQa = providers.gradleProperty("isolatedQa").orNull == "true"
+            if (isolatedQa) {
+                applicationIdSuffix = ".qa"
+                versionNameSuffix = "-qa"
+            }
+            manifestPlaceholders["debugAppLabel"] = if (isolatedQa) "IONIQ 6 QA" else "IONIQ 6"
         }
         release {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")

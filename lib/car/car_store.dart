@@ -403,14 +403,19 @@ class CarStore extends ChangeNotifier {
     final client = _client;
     if (client == null) return;
     try {
-      final changes = await client.history(E.activity, DateTime.now().subtract(const Duration(hours: 48)));
+      final map = _map;
+      final changes = await client.history(
+        E.activity.map(map.actual).toList(),
+        DateTime.now().subtract(const Duration(hours: 48)),
+      );
       final last = <String, String>{};
       final out = <ActivityItem>[];
       for (final c in changes) {
-        final before = last[c.entityId];
-        last[c.entityId] = c.state;
+        final id = map.canonical(c.entityId);
+        final before = last[id];
+        last[id] = c.state;
         if (before == null || before == c.state) continue;
-        final title = _describe(c.entityId, c.state);
+        final title = _describe(id, c.state);
         if (title != null) out.add(ActivityItem(c.lastChanged, title));
       }
       _history = out;
@@ -442,7 +447,7 @@ class CarStore extends ChangeNotifier {
     final client = _client;
     if (client == null) return const [];
     final now = DateTime.now();
-    return client.statistics(E.odometer, DateTime(now.year, now.month - 5));
+    return client.statistics(_map.actual(E.odometer), DateTime(now.year, now.month - 5));
   }
 
   bool locating = false;
@@ -551,7 +556,7 @@ class CarStore extends ChangeNotifier {
       StopClimateCommand() => !car.climateOn,
       StartChargeCommand() => car.charging,
       StopChargeCommand() => !car.charging,
-      SetChargeLimitsCommand(:final ac) => car.acLimit == ac,
+      SetChargeLimitsCommand(:final ac, :final dc) => car.acLimit == ac && car.dcLimit == dc,
       ValetCommand(:final on) => car.valetOn == on,
       PreconditionCommand(:final on) => car.preconditioningOn == on,
       null => false,

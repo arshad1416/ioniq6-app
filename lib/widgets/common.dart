@@ -63,7 +63,21 @@ class SubScreen extends StatelessWidget {
           Expanded(
             child: scroll
                 ? ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [body])
-                : Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 0), child: body),
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Keep the car illustration flexible on tall screens, but
+                      // let every control remain reachable in landscape and at
+                      // larger accessibility text sizes.
+                      final minimum = 600 * MediaQuery.textScalerOf(context).scale(1);
+                      final height = constraints.maxHeight < minimum ? minimum : constraints.maxHeight;
+                      return SingleChildScrollView(
+                        child: SizedBox(
+                          height: height,
+                          child: Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 0), child: body),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

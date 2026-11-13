@@ -28,27 +28,55 @@ class HoldButton extends StatefulWidget {
 }
 
 class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateMixin {
+  int? _pointer;
+
   late final AnimationController _c = AnimationController(vsync: this, duration: widget.holdFor)
     ..addStatusListener((s) {
       if (s == AnimationStatus.completed) {
-        HapticFeedback.heavyImpact();
-        widget.onHeld();
+        final shouldFire = _pointer != null && widget.enabled;
+        _pointer = null;
         _c.value = 0;
+        if (shouldFire) {
+          HapticFeedback.heavyImpact();
+          widget.onHeld();
+        }
       }
     });
 
-  void _down() {
-    if (!widget.enabled) return;
+  void _down(PointerDownEvent event) {
+    if (!widget.enabled || _pointer != null) return;
+    _pointer = event.pointer;
     HapticFeedback.selectionClick();
     _c.forward(from: 0);
   }
 
-  void _up() {
+  void _up(PointerEvent event) {
+    if (_pointer != event.pointer) return;
+    _pointer = null;
     if (_c.isAnimating) {
       _c.animateBack(0, duration: const Duration(milliseconds: 200));
       ScaffoldMessenger.maybeOf(context)
         ?..hideCurrentSnackBar()
         ..showSnackBar(const SnackBar(content: Text('Press and hold to confirm'), duration: Duration(seconds: 1)));
+    }
+  }
+
+  void _move(PointerMoveEvent event) {
+    if (_pointer != event.pointer) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && !(Offset.zero & box.size).contains(event.localPosition)) {
+      _pointer = null;
+      _c.reset();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HoldButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _c.duration = widget.holdFor;
+    if (!widget.enabled) {
+      _pointer = null;
+      _c.reset();
     }
   }
 
@@ -63,9 +91,10 @@ class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateM
     button: true,
     onLongPress: widget.enabled ? widget.onHeld : null,
     child: Listener(
-      onPointerDown: (_) => _down(),
-      onPointerUp: (_) => _up(),
-      onPointerCancel: (_) => _up(),
+      onPointerDown: _down,
+      onPointerMove: _move,
+      onPointerUp: _up,
+      onPointerCancel: _up,
       child: AnimatedBuilder(animation: _c, builder: (context, _) => widget.builder(context, _c.value)),
     ),
   );

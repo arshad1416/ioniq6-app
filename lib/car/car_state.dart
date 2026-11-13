@@ -29,13 +29,20 @@ class CarState {
     return (v == null || v == 'unknown' || v == 'unavailable') ? null : v;
   }
 
-  double? _num(String id) => double.tryParse(_str(id) ?? '');
+  static double? _finite(Object? value) {
+    if (value is! num) return null;
+    final number = value.toDouble();
+    return number.isFinite ? number : null;
+  }
+
+  double? _num(String id) => _finite(double.tryParse(_str(id) ?? ''));
   bool _on(String id) => _str(id) == 'on';
 
   /// On, off, or null when Home Assistant doesn't know.
   bool? _flag(String id) => switch (_str(id)) {
-    null => null,
-    final v => v == 'on',
+    'on' => true,
+    'off' => false,
+    _ => null,
   };
 
   /// True when all are known off, false when any is on, else null.
@@ -91,17 +98,17 @@ class CarState {
     return chargeKw;
   }
 
-  double? get sessionKwh => onHomeCharger ? (_attrs(E.chargerVehicle)['session_kwh'] as num?)?.toDouble() : null;
+  double? get sessionKwh => onHomeCharger ? _finite(_attrs(E.chargerVehicle)['session_kwh']) : null;
   double? get sessionCost => onHomeCharger ? _num(E.chargerSessionCost) : null;
   double? get energyMonthKwh => _num(E.energyMonth);
   double? get costMonth => _num(E.costMonth);
 
   bool get climateOn => _on(E.climateSwitch) || (_str(E.climate) != null && _str(E.climate) != 'off');
   double? get setTempC => _num(E.setTemp);
-  double? get cabinTempC => (_attrs(E.climate)['current_temperature'] as num?)?.toDouble();
+  double? get cabinTempC => _finite(_attrs(E.climate)['current_temperature']);
 
   /// Home Assistant's weather, which is for home, not necessarily where the car is.
-  double? get homeWeatherC => (_attrs(E.weather)['temperature'] as num?)?.toDouble();
+  double? get homeWeatherC => _finite(_attrs(E.weather)['temperature']);
   bool get atHome => parkedAt == 'home';
   bool get defrostOn => _on(E.defrost);
   bool get wheelHeatOn => _on(E.wheelHeat);
@@ -136,7 +143,10 @@ class CarState {
     for (final id in [E.parked, E.location]) {
       final a = _attrs(id);
       final lat = a['latitude'], lon = a['longitude'];
-      if (lat is num && lon is num) return (lat.toDouble(), lon.toDouble());
+      final latitude = _finite(lat), longitude = _finite(lon);
+      if (latitude != null && longitude != null && latitude.abs() <= 90 && longitude.abs() <= 180) {
+        return (latitude, longitude);
+      }
     }
     return null;
   }
@@ -164,10 +174,14 @@ class CarState {
     _ => null,
   };
 
-  int? get valetMaxSpeed => (_attrs(E.valet)['maxSpeed'] as num?)?.round();
+  int? get valetMaxSpeed => _finite(_attrs(E.valet)['maxSpeed'])?.round();
 
   /// The image entity's own URL (path plus access token) for a 360 view.
-  String? cameraPicture(String view) => _attrs(E.camera(view))['entity_picture'] as String?;
+  String? cameraPicture(String view) {
+    final value = _attrs(E.camera(view))['entity_picture'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
   DateTime? get cameraTakenAt => DateTime.tryParse(_str(E.camera('front')) ?? '')?.toLocal();
   bool get hasCamera => _s.containsKey(E.camera('front'));
 
@@ -181,10 +195,10 @@ class CarState {
       out.add(
         DailyStat(
           day,
-          value['distance'] as num? ?? 0,
-          value['total_consumed'] as num? ?? 0,
-          value['regenerated_energy'] as num? ?? 0,
-          value['climate_consumption'] as num? ?? 0,
+          _finite(value['distance']) ?? 0,
+          _finite(value['total_consumed']) ?? 0,
+          _finite(value['regenerated_energy']) ?? 0,
+          _finite(value['climate_consumption']) ?? 0,
         ),
       );
     }

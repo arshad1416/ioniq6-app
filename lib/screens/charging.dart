@@ -74,15 +74,14 @@ class _ChargingScreenState extends State<ChargingScreen> {
         ),
         Panel(
           children: [
-            Row(
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 Text('Charge limit: $limit%', style: Txt.body(15, weight: 500)),
-                Flexible(
-                  child: Text(
-                    car.charging ? ' · Charging' : (car.plugged ? ' · Plugged in' : ' · Unplugged'),
-                    style: Txt.muted(15),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  car.charging ? '· Charging' : (car.plugged ? '· Plugged in' : '· Unplugged'),
+                  style: Txt.muted(15),
                 ),
               ],
             ),

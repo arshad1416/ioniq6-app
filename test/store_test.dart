@@ -23,6 +23,9 @@ class FakeHa extends HaClient {
   ];
   List<String> subscribed = [];
   Object? pingError;
+  List<String>? historyIds;
+  String? statisticsId;
+  List<EntityState> historyResult = [];
 
   @override
   Future<List<Map<String, dynamic>>> entityRegistry() async => registry;
@@ -44,7 +47,16 @@ class FakeHa extends HaClient {
       calls.add((domain, service, data));
 
   @override
-  Future<List<EntityState>> history(List<String> ids, DateTime start) async => [];
+  Future<List<EntityState>> history(List<String> ids, DateTime start) async {
+    historyIds = ids;
+    return historyResult;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> statistics(String id, DateTime start, {String period = 'month'}) async {
+    statisticsId = id;
+    return [];
+  }
 
   @override
   Future<void> close() async {}
@@ -244,5 +256,36 @@ void main() {
     await store.start();
     expect(tried, ['192.168.1.5', 'ha.test']);
     expect(store.connection, Connection.live);
+  });
+  test('charge limits remain pending until both AC and DC are confirmed', () async {
+    final (store, fake) = await liveStore(commands: true);
+    addTearDown(store.dispose);
+    final ac = store.car.acLimit!;
+    final dc = store.car.dcLimit == 80 ? 90 : 80;
+    await store.send(SetChargeLimitsCommand(ac, dc));
+    expect(store.pending, isA<SetChargeLimitsCommand>());
+    fake.updates.add([demoStates()[E.dcLimit]!.copyWith(state: '$dc')]);
+    await Future<void>.delayed(Duration.zero);
+    expect(store.pending, isNull);
+  });
+
+  test('history and statistics follow renamed entities', () async {
+    final fake = FakeHa();
+    fake.registry = [
+      for (final e in fake.registry) {...e, 'entity_id': '${e['entity_id']}_2'},
+    ];
+    final then = DateTime(2026, 11, 1);
+    fake.historyResult = [
+      EntityState('${E.lock}_2', 'locked', {}, then),
+      EntityState('${E.lock}_2', 'unlocked', {}, then.add(const Duration(minutes: 1))),
+    ];
+    final store = CarStore(Settings(configured()), clientFactory: (_, _) => fake);
+    addTearDown(store.dispose);
+    await store.start();
+    await store.loadHistory();
+    expect(fake.historyIds, [for (final id in E.activity) '${id}_2']);
+    expect(store.activity.map((a) => a.title), contains('Unlocked'));
+    await store.monthlyOdometer();
+    expect(fake.statisticsId, '${E.odometer}_2');
   });
 }

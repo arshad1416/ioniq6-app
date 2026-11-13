@@ -47,3 +47,8 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 test/screenshots/failures/
+
+# Signing keys and their passwords
+*.jks
+*.keystore
+key.properties

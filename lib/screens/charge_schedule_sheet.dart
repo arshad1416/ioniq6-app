@@ -42,9 +42,10 @@ class _ChargeScheduleSheetState extends State<ChargeScheduleSheet> {
   }
 
   Future<void> _save() async {
-    await runCommand(context, SetOffPeakCommand(mode: _mode, start: _start, end: _end));
-    // Only close the sheet if it's still open; it may have been dismissed meanwhile.
-    if (mounted) Navigator.of(context).pop();
+    final sent = await runCommand(context, SetOffPeakCommand(mode: _mode, start: _start, end: _end));
+    // Close only once it's saved (so a failure can be retried), and only if
+    // the sheet is still open; it may have been dismissed meanwhile.
+    if (sent && mounted) Navigator.of(context).pop();
   }
 
   @override

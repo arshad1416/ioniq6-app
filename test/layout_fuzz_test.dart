@@ -8,7 +8,7 @@ import 'package:ioniq6_companion/widgets/rive_view.dart';
 void main() {
   for (final size in [const Size(360, 800), const Size(320, 568), const Size(800, 360)]) {
     for (final scale in [1.0, 1.5]) {
-      for (final route in ['/', '/controls', '/climate', '/charging', '/stats', '/health', '/activity', '/settings', '/camera', '/emergency', '/valet']) {
+      for (final route in ['/', '/controls', '/climate', '/charging', '/stats', '/health', '/activity', '/settings', '/camera', '/emergency', '/valet', '/trip']) {
         testWidgets('$route at $size text $scale', (tester) async {
           RiveView.enabled = false;
           tester.view.physicalSize = size;

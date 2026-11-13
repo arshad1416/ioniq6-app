@@ -53,7 +53,7 @@ class _BluelinkSetupState extends State<BluelinkSetup> {
       return;
     }
     final challenge = await _store.directSignIn();
-    if (challenge == null) return;
+    if (!mounted || challenge == null) return;
     await _store.bluelink.sendOtp(challenge);
     if (!mounted) return;
     final code = await _askForCode(challenge.email);
@@ -70,6 +70,7 @@ class _BluelinkSetupState extends State<BluelinkSetup> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
+        scrollable: true,
         backgroundColor: Palette.raise,
         title: Text('Enter the code', style: Txt.display(22, weight: 400)),
         content: Column(

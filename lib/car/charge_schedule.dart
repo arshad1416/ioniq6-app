@@ -108,7 +108,7 @@ class ChargeSchedule {
   static int? _minutes(Object? t) {
     if (t is! Map) return null;
     final raw = t['time'], section = t['timeSection'];
-    if (raw is! String || raw.length != 4 || (section != 0 && section != 1)) return null;
+    if (raw is! String || !RegExp(r'^[0-9]{4}$').hasMatch(raw) || (section != 0 && section != 1)) return null;
     final h = int.tryParse(raw.substring(0, 2)), m = int.tryParse(raw.substring(2));
     if (h == null || m == null || h < 0 || h > 12 || m > 59) return null;
     return ((h % 12) + (section == 1 ? 12 : 0)) * 60 + m;
@@ -133,6 +133,7 @@ String daySummary(List<int> days) {
 /// Minutes after midnight as Bluelink's 12-hour time: {"time": "hhmm",
 /// "timeSection": 0 for AM, 1 for PM}.
 Map<String, dynamic> bluelinkTime(int minutes) {
+  RangeError.checkValueInInterval(minutes, 0, 1439, 'minutes');
   final h = minutes ~/ 60, m = minutes % 60;
   final h12 = h % 12 == 0 ? 12 : h % 12;
   return {'time': '${h12.toString().padLeft(2, '0')}${m.toString().padLeft(2, '0')}', 'timeSection': h >= 12 ? 1 : 0};

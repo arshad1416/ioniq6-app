@@ -118,4 +118,38 @@ void main() {
     expect(car.chargeSchedule?.mode, OffPeakMode.only);
     expect(statesFromBluelink({'evStatus': <String, dynamic>{}}).any((e) => e.entityId == E.carData), isFalse);
   });
+  test('all daily minute values round-trip through every off-peak mode', () {
+    for (final mode in OffPeakMode.values) {
+      for (var minute = 0; minute < 1440; minute++) {
+        final end = (minute + 61) % 1440;
+        final encoded = withOffPeak(sample(), mode, minute, end);
+        final decoded = ChargeSchedule.tryParse(encoded)!;
+        expect((decoded.start, decoded.end, decoded.mode), (minute, end, mode), reason: '$mode $minute');
+      }
+    }
+  });
+
+  test('malformed signed or whitespace times are unknown', () {
+    for (final time in ['12-1', '01-1', '+100', ' 100', '01+1', '01 1', '1260', '1300']) {
+      expect(ChargeSchedule.tryParse(sample(start: time)), isNull, reason: time);
+    }
+  });
+
+  test('schedule encoding refuses minutes outside a single day', () {
+    for (final minute in [-1440, -1, 1440, 1500, 999999]) {
+      expect(() => bluelinkTime(minute), throwsRangeError, reason: '$minute');
+    }
+  });
+
+  test('schedule update deep copies departures without mutating current data', () {
+    for (var minute = 0; minute < 1440; minute += 15) {
+      final current = sample();
+      final body = srcfsSchedule(current, OffPeakMode.only, minute, (minute + 60) % 1440);
+      final original = (current['reservChargeInfo'] as Map)['reservChargeInfoDetail'] as Map;
+      final copied = (body['reservChargeInfo'] as Map)['reservChargeInfoDetail'] as Map;
+      expect((original['reservFatcSet'] as Map).containsKey('heating1'), isFalse);
+      ((copied['reservInfo'] as Map)['day'] as List).clear();
+      expect((original['reservInfo'] as Map)['day'], [1, 2, 3, 4, 5]);
+    }
+  });
 }

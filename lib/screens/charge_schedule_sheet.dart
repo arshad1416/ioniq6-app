@@ -37,7 +37,7 @@ class _ChargeScheduleSheetState extends State<ChargeScheduleSheet> {
       builder: (context, child) =>
           MediaQuery(data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true), child: child!),
     );
-    if (picked == null) return;
+    if (!mounted || picked == null) return;
     setState(() => start ? _start = picked.hour * 60 + picked.minute : _end = picked.hour * 60 + picked.minute);
   }
 
@@ -55,7 +55,8 @@ class _ChargeScheduleSheetState extends State<ChargeScheduleSheet> {
     final canEdit = store.settings.commandsEnabled || store.isDemo;
     Widget line(String label, String value, {VoidCallback? onTap}) => ListTile(
       title: Text(label, style: Txt.body(16)),
-      trailing: Text(value, style: onTap == null ? Txt.muted(16) : Txt.body(16)),
+      subtitle: Text(value, style: onTap == null ? Txt.muted(16) : Txt.body(16)),
+      trailing: onTap == null ? null : const Icon(Icons.edit_outlined, size: 20),
       onTap: onTap,
     );
     String departure(Departure d) {

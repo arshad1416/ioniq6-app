@@ -1,0 +1,52 @@
+import 'dart:io';
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:ioniq6_companion/car/car_store.dart';
+import 'package:ioniq6_companion/car/settings.dart';
+import 'package:ioniq6_companion/main.dart';
+
+// No live credentials, no platform bridge, and socket creation is forbidden.
+class NoNetwork extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) => super.createHttpClient(context)
+    ..connectionFactory = ((_, _, _) => Future.error(StateError('Device fuzz must stay offline')));
+}
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('isolated real-device routes, scroll, back and repeated navigation', (tester) async {
+    HttpOverrides.global = NoNetwork();
+    final store = CarStore(Settings(MemorySettingsBackend()));
+    await store.start();
+    await tester.pumpWidget(CompanionApp(store: store));
+    await tester.pump(const Duration(seconds: 2));
+    expect(store.isDemo, isTrue);
+    const routes = ['/controls', '/climate', '/charging', '/stats', '/health', '/activity', '/settings', '/camera', '/emergency', '/valet', '/trip'];
+    final random = Random(6013);
+    for (var pass = 0; pass < 3; pass++) {
+      final order = routes.toList()..shuffle(random);
+      for (final route in order) {
+        CompanionApp.navigator.currentState!.pushNamed(route);
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump(const Duration(seconds: 1));
+        expect(tester.takeException(), isNull, reason: '$route initial pass $pass');
+        final scrolls = find.byType(Scrollable);
+        if (scrolls.evaluate().isNotEmpty) {
+          await tester.drag(scrolls.first, const Offset(0, -280));
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.drag(scrolls.first, const Offset(0, 280));
+          await tester.pump(const Duration(milliseconds: 400));
+        }
+        CompanionApp.navigator.currentState!.pop();
+        await tester.pump(const Duration(seconds: 1));
+        expect(tester.takeException(), isNull, reason: '$route return pass $pass');
+        expect(find.text('IONIQ 6'), findsOneWidget);
+      }
+    }
+    expect(store.isDemo, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    store.dispose();
+  });
+}

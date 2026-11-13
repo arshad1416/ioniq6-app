@@ -1,0 +1,262 @@
+"""Bluelink Canada calls that the kia_uvo integration doesn't make.
+
+Every call goes through kia_uvo's own VehicleManager (its session, token and
+PIN), so Home Assistant still holds a single Bluelink login. Request shapes
+come from the MyHyundai Bluelink Android app 2.0.47 (com.hyundaicanada.bluelink):
+all POSTs to https://mybluelink.ca/tods/api/ with JSON bodies whose keys are
+the app's field names.
+
+These functions block; call them from an executor.
+"""
+
+from __future__ import annotations
+
+import base64
+import io
+import logging
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Callable
+
+_LOGGER = logging.getLogger(__name__)
+
+# The 360 camera's views, in the order they sit in the image strip, then the
+# larger top-down view that follows them.
+SVM_VIEWS = ("front", "rear", "left", "right")
+SVM_TOP = "top"
+
+# Server-side limits on new 360 shots.
+SVM_LIMIT_ERRORS = {
+    "7659": "Bluelink refused the 360 request",
+    "7661": "This month's 360 camera requests are used up",
+    "7662": "Today's 360 camera requests are used up",
+}
+
+
+class BluelinkError(Exception):
+    """Bluelink answered with an error."""
+
+
+@dataclass
+class Location:
+    lat: float
+    lon: float
+    heading: int | None
+    time: str | None
+
+
+@dataclass
+class ValetStatus:
+    on: bool
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SvmShots:
+    """The latest 360 shots: PNG/JPEG bytes per view, and when they were taken."""
+
+    images: dict[str, bytes]
+    taken: datetime | None
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+class Bluelink:
+    """Extra calls for one vehicle, made with kia_uvo's VehicleManager."""
+
+    def __init__(
+        self, vehicle_manager: Any, vehicle_id: str, entry_pin: Callable[[], str | None] = lambda: None
+    ) -> None:
+        self._vm = vehicle_manager
+        self._vehicle_id = vehicle_id
+        self._entry_pin = entry_pin
+
+    @property
+    def _pin(self) -> str:
+        """The Bluelink PIN. kia_uvo's token doesn't always carry it (it can be
+        restored without one), so fall back to its manager and config entry."""
+        pin = getattr(self._vm.token, "pin", None) or getattr(self._vm, "pin", None) or self._entry_pin()
+        if not pin:
+            raise BluelinkError("No Bluelink PIN; add it in the Hyundai / Kia Connect integration's options")
+        return str(pin)
+
+    @property
+    def _api(self) -> Any:
+        return self._vm.api
+
+    @property
+    def _vehicle(self) -> Any:
+        return self._vm.get_vehicle(self._vehicle_id)
+
+    def _headers(self, pin: bool) -> dict[str, str]:
+        self._vm.check_and_refresh_token()
+        token = self._vm.token
+        headers = dict(self._api.API_HEADERS)  # never mutate the shared dict
+        # The library's own commands write these into its shared headers; a
+        # stale one makes Bluelink reject the next call.
+        for stale in ("pAuth", "transactionId", "accessToken", "vehicleId"):
+            headers.pop(stale, None)
+        # The library talks like the web portal; Bluelink refuses some calls
+        # from there (6459), so talk like the phone app instead.
+        for web in ("Origin", "Referer", "Sec-Fetch-Dest", "Sec-Fetch-Mode", "Sec-Fetch-Site"):
+            headers.pop(web, None)
+        headers.update({"from": "SPA", "brand": "H", "Content-Type": "application/json"})
+        headers["offset"] = str(int(datetime.now().astimezone().utcoffset().total_seconds() // 3600))
+        headers["accessToken"] = token.access_token
+        headers["vehicleId"] = self._vehicle.id
+        if pin:
+            headers["pAuth"] = self._pin_token(headers)
+        return headers
+
+    def _pin_token(self, headers: dict[str, str]) -> str:
+        """vrfypin: trades the PIN for the pAuth token that commands need."""
+        response = self._api.sessions.post(
+            self._api.API_URL + "vrfypin", headers=headers, json={"pin": self._pin}
+        )
+        data = self._check(_json(response))
+        pauth = (data.get("result") or {}).get("pAuth")
+        if not pauth:
+            raise BluelinkError("Bluelink didn't accept the PIN")
+        return pauth
+
+    @staticmethod
+    def _check(data: dict[str, Any]) -> dict[str, Any]:
+        header = data.get("responseHeader") or {}
+        if header.get("responseCode") == 1 or "error" in data and data["error"]:
+            error = data.get("error") or {}
+            code = str(error.get("errorCode", ""))
+            _LOGGER.warning("Bluelink error %s: %s", code, error.get("errorDesc"))
+            raise BluelinkError(SVM_LIMIT_ERRORS.get(code) or error.get("errorDesc") or f"Bluelink error {code}")
+        return data
+
+    def _post(self, path: str, *, pin: bool = False, body: dict[str, Any] | None = None):
+        url, headers = self._api.API_URL + path, self._headers(pin)
+        if body is None:  # the app sends these with no body at all
+            response = self._api.sessions.post(url, headers=headers, data=b"")
+        else:
+            response = self._api.sessions.post(url, headers=headers, json=body)
+        return self._check(_json(response)), response.headers
+
+    # Location ---------------------------------------------------------------
+
+    def locate(self) -> Location | None:
+        """Find My Car (read only), with the app's EV call."""
+        data, _ = self._post("evc/fme", pin=True)
+        result = data.get("result") or {}
+        coord = result.get("coord") or (result.get("gpsDetail") or {}).get("coord") or {}
+        if coord.get("lat") is None or coord.get("lon") is None:
+            return None
+        return Location(lat=float(coord["lat"]), lon=float(coord["lon"]), heading=result.get("head"), time=result.get("time"))
+
+    # Valet ------------------------------------------------------------------
+
+    def valet_status(self) -> ValetStatus:
+        data, _ = self._post("valet/lastvaletstatus")
+        result = data.get("result") or {}
+        # The app treats 0 and 3 as active; anything else, including null, is off.
+        return ValetStatus(on=result.get("valetMode") in (0, 3), raw=result)
+
+    def set_valet(self, on: bool) -> None:
+        """A car command: only ever called from the valet switch."""
+        _, headers = self._post(
+            "valet/activate" if on else "valet/deactivate", pin=True, body={"pin": self._pin}
+        )
+        transaction = headers.get("transactionId")
+        if transaction:
+            self._wait(transaction)
+
+    def _wait(self, transaction: str, timeout: int = 90) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            status = self._vm.check_action_status(self._vehicle_id, transaction)
+            name = getattr(status, "name", str(status))
+            if name == "SUCCESS":
+                return
+            if name in ("FAILED", "TIMEOUT"):
+                raise BluelinkError("The car didn't confirm the change")
+            time.sleep(5)
+        raise BluelinkError("The car didn't answer in time")
+
+    # Battery preconditioning --------------------------------------------------
+
+    def preconditioning(self) -> bool | None:
+        """Whether the battery is warming, from kia_uvo's last status (no call)."""
+        data = getattr(self._vehicle, "data", None) or {}
+        value = ((data.get("status") or {}).get("evStatus") or {}).get("batteryPreconditiong")
+        return None if value is None else bool(value)
+
+    def set_preconditioning(self, on: bool) -> None:
+        """A car command: warms (or stops warming) the battery for fast charging."""
+        _, headers = self._post("evc/prcndtngon" if on else "evc/prcndtngoff", pin=True, body={"pin": self._pin})
+        transaction = headers.get("transactionId")
+        if transaction:
+            self._wait(transaction)
+
+    # 360 camera ---------------------------------------------------------------
+
+    def request_svm(self) -> None:
+        """Asks the car to take new 360 shots. A car command with daily and
+        monthly limits; only ever called from the take_360_shots service."""
+        # As the phone app does it: the PIN check is only a gate (its pAuth
+        # isn't passed on), then the request with no body.
+        self._pin_token(self._headers(pin=False))
+        self._post("rfc/fndmcrsvm")
+
+    def last_svm(self) -> SvmShots | None:
+        """The latest stored 360 shots (read only)."""
+        data, _ = self._post("rfc/lastmcrsvm")
+        result = data.get("result") or {}
+        locations = result.get("svmLocations") or []
+        if not locations:
+            return None
+        latest = locations[0]
+        image = latest.get("svmImage")
+        size = latest.get("imageSize") or []
+        if not image or len(size) < 6:
+            return None
+        return SvmShots(images=split_svm(image, size), taken=_parse_time(latest), raw=_without_image(latest))
+
+
+def _json(response: Any) -> dict[str, Any]:
+    """The reply's JSON; some commands (like rfc/fndmcrsvm) answer with an empty body."""
+    try:
+        data = response.json()
+    except ValueError:
+        status = getattr(response, "status_code", 200)
+        if status < 400:
+            return {}
+        raise BluelinkError(f"Bluelink answered HTTP {status}") from None
+    return data if isinstance(data, dict) else {}
+
+
+def split_svm(image_b64: str, size: list[Any]) -> dict[str, bytes]:
+    """Cuts the strip into the four camera views and the top-down view.
+
+    imageSize[2] × [3] is each camera view, laid side by side from x = 0;
+    [4] × [5] is the top-down view, which starts at x = 4 × [2].
+    """
+    from PIL import Image  # Home Assistant ships Pillow
+
+    strip = Image.open(io.BytesIO(base64.b64decode(image_b64)))
+    w, h = int(size[2]), int(size[3])
+    tw, th = int(size[4]), int(size[5])
+    boxes = {view: (i * w, 0, (i + 1) * w, h) for i, view in enumerate(SVM_VIEWS)}
+    boxes[SVM_TOP] = (4 * w, 0, 4 * w + tw, th)
+    out: dict[str, bytes] = {}
+    for view, box in boxes.items():
+        buf = io.BytesIO()
+        strip.crop(box).convert("RGB").save(buf, format="JPEG", quality=88)
+        out[view] = buf.getvalue()
+    return out
+
+
+def _parse_time(location: dict[str, Any]) -> datetime | None:
+    """utcTime is yyyyMMddHHmmss in UTC."""
+    try:
+        return datetime.strptime(str(location.get("utcTime")), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _without_image(location: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in location.items() if k != "svmImage"}

@@ -100,15 +100,15 @@ class _HoldButtonState extends State<HoldButton> with SingleTickerProviderStateM
   );
 }
 
-/// Sends [cmd] and reports failures in a snackbar.
-Future<void> runCommand(BuildContext context, CarCommand cmd) async {
+/// Sends [cmd] and reports failures in a snackbar. True when it was sent.
+Future<bool> runCommand(BuildContext context, CarCommand cmd) async {
   final store = AppScope.of(context);
   final messenger = ScaffoldMessenger.of(context);
   if (store.settings.biometricCommands &&
       !store.isDemo &&
       !await Biometrics.confirm('Confirm to ${cmd.label.toLowerCase()}')) {
     messenger.showSnackBar(SnackBar(content: Text('${cmd.label}: not confirmed, nothing sent')));
-    return;
+    return false;
   }
   final direct = store.usingDirect;
   try {
@@ -122,11 +122,13 @@ Future<void> runCommand(BuildContext context, CarCommand cmd) async {
         ),
       ),
     );
+    return true;
   } on CommandsDisabled catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('$e')));
   } catch (e) {
     messenger.showSnackBar(SnackBar(content: Text('${cmd.label} failed: $e')));
   }
+  return false;
 }
 
 /// A switch that only changes with a press-and-hold, sending [command] for

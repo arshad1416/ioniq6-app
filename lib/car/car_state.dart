@@ -1,5 +1,6 @@
 import '../ha/entities.dart';
 import '../ha/ha_client.dart';
+import 'charge_schedule.dart';
 
 enum DoorLock { locked, unlocked, locking, unlocking, error, unknown }
 
@@ -85,6 +86,14 @@ class CarState {
   int? get stationChargeMinutes => _num(E.stationChargeMinutes)?.round();
   int? get acLimit => _num(E.acLimit)?.round();
   int? get dcLimit => _num(E.dcLimit)?.round();
+
+  /// The off-peak window and departures stored in the car; null when unknown.
+  ChargeSchedule? get chargeSchedule {
+    final data = _attrs(E.carData)['vehicle_data'];
+    final status = data is Map ? data['status'] : null;
+    final ev = status is Map ? status['evStatus'] : null;
+    return ChargeSchedule.tryParse(ev is Map ? ev['reservChargeInfos'] : null);
+  }
 
   /// Whether the home charger's last or current session is this car.
   bool get onHomeCharger => _str(E.chargerVehicle) == 'ioniq_6';

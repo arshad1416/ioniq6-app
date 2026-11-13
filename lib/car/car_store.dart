@@ -14,6 +14,7 @@ import 'camera_cache.dart';
 import 'car_state.dart';
 import 'outside_weather.dart';
 import 'commands.dart';
+import 'charge_schedule.dart';
 import 'demo_data.dart';
 import 'health.dart';
 import 'settings.dart';
@@ -559,6 +560,10 @@ class CarStore extends ChangeNotifier {
       SetChargeLimitsCommand(:final ac, :final dc) => car.acLimit == ac && car.dcLimit == dc,
       ValetCommand(:final on) => car.valetOn == on,
       PreconditionCommand(:final on) => car.preconditioningOn == on,
+      SetOffPeakCommand(:final mode, :final start, :final end) => switch (car.chargeSchedule) {
+        final s? => s.mode == mode && (mode == OffPeakMode.off || (s.start == start && s.end == end)),
+        null => false,
+      },
       null => false,
       _ => true,
     };
@@ -608,6 +613,26 @@ class CarStore extends ChangeNotifier {
         set(E.valet, on ? 'on' : 'off');
       case PreconditionCommand(:final on):
         set(E.preconditioning, on ? 'on' : 'off');
+      case SetOffPeakCommand(:final mode, :final start, :final end):
+        final prev = car.entities.where((e) => e.entityId == E.carData).firstOrNull;
+        final data = prev?.attributes['vehicle_data'];
+        final status = data is Map ? data['status'] : null;
+        final ev = status is Map ? status['evStatus'] : null;
+        final info = ev is Map ? ev['reservChargeInfos'] : null;
+        if (info is Map) {
+          car = car.withEntity(
+            EntityState(E.carData, prev!.state, {
+              ...prev.attributes,
+              'vehicle_data': {
+                ...data as Map,
+                'status': {
+                  ...status as Map,
+                  'evStatus': {...ev as Map, 'reservChargeInfos': withOffPeak(info, mode, start, end)},
+                },
+              },
+            }, now),
+          );
+        }
       case OpenChargePortCommand() || FlashCommand() || HonkCommand() || TakeCameraShotsCommand():
         break;
     }

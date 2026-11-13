@@ -1,4 +1,5 @@
 import '../ha/entities.dart';
+import 'charge_schedule.dart';
 
 /// Seat setting codes used by `kia_uvo.start_climate`.
 enum SeatLevel {
@@ -194,4 +195,28 @@ class PreconditionCommand extends CarCommand {
   String get service => on ? 'turn_on' : 'turn_off';
   @override
   Map<String, dynamic> get data => {'entity_id': E.preconditioning};
+}
+
+/// Sets the car's off-peak window and how it uses it, keeping its departure
+/// times (Bluelink evc/srcfs, or v2/rc/ev/reschargeset on Gen3 cars, through
+/// the ioniq6_extras add-on).
+class SetOffPeakCommand extends CarCommand {
+  const SetOffPeakCommand({required this.mode, required this.start, required this.end});
+  final OffPeakMode mode;
+
+  /// Minutes after midnight.
+  final int start, end;
+
+  @override
+  String get label => switch (mode) {
+    OffPeakMode.off => 'Turn off off-peak charging',
+    OffPeakMode.prefer => 'Prefer off-peak ${clock(start)}–${clock(end)}',
+    OffPeakMode.only => 'Charge only off-peak ${clock(start)}–${clock(end)}',
+  };
+  @override
+  String get domain => 'ioniq6_extras';
+  @override
+  String get service => 'set_off_peak_charging';
+  @override
+  Map<String, dynamic> get data => {'mode': mode.name, 'start': clock(start), 'end': clock(end)};
 }

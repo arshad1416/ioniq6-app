@@ -149,3 +149,102 @@ def test_no_pin_anywhere_is_readable():
     with pytest.raises(bluelink.BluelinkError, match="No Bluelink PIN"):
         b.request_svm()
     assert api.calls == []
+
+
+# Charge schedule --------------------------------------------------------------
+
+SCHEDULE = {
+    "reservChargeInfo": {
+        "reservChargeInfoDetail": {
+            "reservInfo": {"day": [1, 2, 3, 4, 5], "time": {"time": "0700", "timeSection": 0}},
+            "reservChargeSet": True,
+            "reservFatcSet": {"defrost": True, "airTemp": {"value": "10H", "unit": 0, "hvacTempType": 1}, "airCtrl": 1},
+        }
+    },
+    "reserveChargeInfo2": {
+        "reservChargeInfoDetail": {
+            "reservInfo": {"day": [1, 2, 3, 4, 5], "time": {"time": "0820", "timeSection": 0}},
+            "reservChargeSet": True,
+            "reservFatcSet": {"defrost": True, "airTemp": {"value": "10H", "unit": 0, "hvacTempType": 1}, "airCtrl": 1},
+        }
+    },
+    "offpeakPowerInfo": {
+        "offPeakPowerFlag": 1,
+        "offPeakPowerTime1": {
+            "starttime": {"time": "1100", "timeSection": 1},
+            "endtime": {"time": "0700", "timeSection": 0},
+        },
+    },
+    "reservFlag": 1,
+}
+
+
+def make_with_schedule(answers, generation=None):
+    b, api = make({"vhcllst": {**OK, "result": {"vehicles": [{"vehicleId": "REGID", "genHeaderType": generation}]}}, **answers})
+    b._vm.get_vehicle = lambda vid: SimpleNamespace(id="REGID", data={"status": {"evStatus": {"reservChargeInfos": SCHEDULE}}})
+    return b, api
+
+
+@pytest.mark.parametrize(
+    "hhmm, expected",
+    [
+        ("23:00", {"time": "1100", "timeSection": 1}),
+        ("07:30", {"time": "0730", "timeSection": 0}),
+        ("00:00", {"time": "1200", "timeSection": 0}),
+        ("12:15", {"time": "1215", "timeSection": 1}),
+    ],
+)
+def test_bluelink_time(hhmm, expected):
+    assert bluelink.bluelink_time(hhmm) == expected
+
+
+def test_set_off_peak_keeps_departures_and_sends_pauth():
+    b, api = make_with_schedule({"evc/srcfs": OK}, generation="Gen2")
+    b.set_off_peak("only", "22:30", "06:00")
+    path, headers, body = api.calls[-1]
+    assert path == "evc/srcfs"
+    assert headers["pAuth"] == "PAUTH"
+    assert body["pin"] == "1234"
+    info = body["reservChargeInfos"]
+    assert info["offpeakPowerInfo"]["offPeakPowerFlag"] == 2
+    window = {"starttime": {"time": "1030", "timeSection": 1}, "endtime": {"time": "0600", "timeSection": 0}}
+    assert info["offpeakPowerInfo"]["offPeakPowerTime1"] == window
+    assert info["offpeakPowerInfo"]["offPeakPowerTime2"] == window
+    assert info["reservFlag"] == 1
+    detail = info["reserveChargeInfo2"]["reservChargeInfoDetail"]
+    assert detail["reservInfo"]["time"] == {"time": "0820", "timeSection": 0}
+    assert detail["reservFatcSet"]["airTemp"]["value"] == "10H"
+    assert detail["reservFatcSet"]["heating1"] == 0
+    # The car's own copy is left alone.
+    assert "heating1" not in SCHEDULE["reservChargeInfo"]["reservChargeInfoDetail"]["reservFatcSet"]
+
+
+def test_set_off_peak_off_clears_reserv_flag():
+    b, api = make_with_schedule({"evc/srcfs": OK})
+    b.set_off_peak("off", "23:00", "07:00")
+    info = api.calls[-1][2]["reservChargeInfos"]
+    assert info["offpeakPowerInfo"]["offPeakPowerFlag"] == 0
+    assert info["reservFlag"] == 0
+
+
+def test_set_off_peak_gen3_uses_window_only_call_without_pauth():
+    b, api = make_with_schedule({"v2/rc/ev/reschargeset": OK}, generation="GEN3")
+    b.set_off_peak("prefer", "23:00", "07:00")
+    assert [c[0] for c in api.calls][-2:] == ["vrfypin", "v2/rc/ev/reschargeset"]
+    _, headers, body = api.calls[-1]
+    assert "pAuth" not in headers
+    assert body == {
+        "pin": "1234",
+        "reservFlag": 1,
+        "offpeakPowerFlag": 1,
+        "reservStartTime": {"time": "1100", "timeSection": 1},
+        "reservEndTime": {"time": "0700", "timeSection": 0},
+    }
+
+
+def test_set_off_peak_without_a_reported_schedule_refuses():
+    b, api = make({"vhcllst": {**OK, "result": {"vehicles": []}}})
+    b._vm.get_vehicle = lambda vid: SimpleNamespace(id="REGID", data={})
+    with pytest.raises(bluelink.BluelinkError, match="hasn't reported"):
+        b.set_off_peak("prefer", "23:00", "07:00")
+    assert not any(c[0] == "evc/srcfs" for c in api.calls)

@@ -10,6 +10,7 @@ import '../theme.dart';
 import '../update/update_prompt.dart';
 import '../widgets/common.dart';
 import 'bluelink_setup.dart';
+import 'charge_schedule_sheet.dart';
 import '../widgets/line_icon.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -129,42 +130,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _showSchedule(ChargeSchedule s) => showModalBottomSheet<void>(
     context: context,
     backgroundColor: Palette.raise,
-    builder: (context) {
-      Widget line(String label, String value) => ListTile(
-        title: Text(label, style: Txt.body(16)),
-        trailing: Text(value, style: Txt.muted(16)),
-      );
-      String departure(Departure d) {
-        if (!d.enabled) return 'Off';
-        final temp = d.tempC == null ? '' : ' ${d.tempC!.toStringAsFixed(d.tempC! % 1 == 0 ? 0 : 1)}°C';
-        return '${daySummary(d.days)} ${clock(d.minutes)}${d.climateOn ? ' · climate$temp' : ''}';
-      }
-
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Charge schedule', style: Txt.display(22, weight: 400)),
-            ),
-            line('Off-peak', switch (s.mode) {
-              OffPeakMode.off => 'Not used',
-              OffPeakMode.prefer => 'Preferred',
-              OffPeakMode.only => 'Only',
-            }),
-            line('Window', s.window),
-            line('Charge for departures', s.scheduledCharging ? 'On' : 'Off'),
-            for (final (i, d) in s.departures.indexed) line('Departure ${i + 1}', departure(d)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Text('Changing the schedule from the app is coming next.', style: Txt.muted(14)),
-            ),
-          ],
-        ),
-      );
-    },
+    isScrollControlled: true,
+    builder: (_) => ChargeScheduleSheet(schedule: s),
   );
 
   Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(

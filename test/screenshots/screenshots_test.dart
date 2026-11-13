@@ -95,4 +95,19 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
     await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/charging_live.png'));
   });
+
+  testWidgets('screenshot the charge schedule sheet', (tester) async {
+    RiveView.enabled = false;
+    tester.view.physicalSize = const Size(1236, 2745);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final store = CarStore(Settings(MemorySettingsBackend()));
+    await store.start();
+    await tester.pumpWidget(CompanionApp(store: store));
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/settings');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Off-peak charging'));
+    await tester.pumpAndSettle();
+    await expectLater(find.byType(MaterialApp), matchesGoldenFile('out/charge_schedule.png'));
+  });
 }

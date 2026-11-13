@@ -89,6 +89,26 @@ void main() {
     expect(const CarState({}).chargeSchedule, isNull);
   });
 
+  test('Bluelink times', () {
+    expect(bluelinkTime(23 * 60), {'time': '1100', 'timeSection': 1});
+    expect(bluelinkTime(0), {'time': '1200', 'timeSection': 0});
+    expect(bluelinkTime(12 * 60 + 5), {'time': '1205', 'timeSection': 1});
+    expect(bluelinkTime(7 * 60 + 30), {'time': '0730', 'timeSection': 0});
+  });
+
+  test('turning off-peak off clears the scheduled-charging flag, as the app does', () {
+    final body = srcfsSchedule(sample(), OffPeakMode.off, 23 * 60, 7 * 60);
+    expect((body['offpeakPowerInfo'] as Map)['offPeakPowerFlag'], 0);
+    expect(body['reservFlag'], 0);
+  });
+
+  test('a saved change shows before the car reports it', () {
+    final updated = ChargeSchedule.tryParse(withOffPeak(sample(), OffPeakMode.only, 22 * 60, 6 * 60))!;
+    expect(updated.mode, OffPeakMode.only);
+    expect(updated.window, '22:00–06:00');
+    expect(updated.departures, hasLength(2));
+  });
+
   test('read from a direct Bluelink status', () {
     final states = statesFromBluelink({
       'evStatus': {'reservChargeInfos': sample(flag: 2)},

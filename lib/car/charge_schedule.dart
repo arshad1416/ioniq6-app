@@ -129,3 +129,60 @@ String daySummary(List<int> days) {
   const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return (set.toList()..sort()).map((d) => names[d]).join(', ');
 }
+
+/// Minutes after midnight as Bluelink's 12-hour time: {"time": "hhmm",
+/// "timeSection": 0 for AM, 1 for PM}.
+Map<String, dynamic> bluelinkTime(int minutes) {
+  final h = minutes ~/ 60, m = minutes % 60;
+  final h12 = h % 12 == 0 ? 12 : h % 12;
+  return {'time': '${h12.toString().padLeft(2, '0')}${m.toString().padLeft(2, '0')}', 'timeSection': h >= 12 ? 1 : 0};
+}
+
+/// Bluelink's offPeakPowerFlag for [mode].
+int offPeakFlag(OffPeakMode mode) => mode.index;
+
+/// The evc/srcfs schedule: the car's departures from [current] as they are,
+/// with a new off-peak window. As the MyHyundai app does it, both off-peak
+/// windows get the same times and reservFlag follows the off-peak flag.
+Map<String, dynamic> srcfsSchedule(Map current, OffPeakMode mode, int start, int end) {
+  Map<String, dynamic> window() => {'starttime': bluelinkTime(start), 'endtime': bluelinkTime(end)};
+  final out = <String, dynamic>{};
+  for (final key in ['reservChargeInfo', 'reserveChargeInfo2']) {
+    final info = current[key];
+    final detail = info is Map ? info['reservChargeInfoDetail'] : null;
+    if (detail is! Map) continue;
+    final copy = _deepCopy(detail) as Map<String, dynamic>;
+    final fatc = copy.putIfAbsent('reservFatcSet', () => <String, dynamic>{});
+    if (fatc is Map) fatc.putIfAbsent('heating1', () => 0);
+    out[key] = {'reservChargeInfoDetail': copy};
+  }
+  final flag = offPeakFlag(mode);
+  out['offpeakPowerInfo'] = {'offPeakPowerFlag': flag, 'offPeakPowerTime1': window(), 'offPeakPowerTime2': window()};
+  out['reservFlag'] = flag == 0 ? 0 : 1;
+  return out;
+}
+
+/// The v2/rc/ev/reschargeset body, for Gen3 cars: only the window.
+Map<String, dynamic> gen3ScheduleBody(String pin, OffPeakMode mode, int start, int end) => {
+  'pin': pin,
+  'reservFlag': mode == OffPeakMode.off ? 0 : 1,
+  'offpeakPowerFlag': offPeakFlag(mode),
+  'reservStartTime': bluelinkTime(start),
+  'reservEndTime': bluelinkTime(end),
+};
+
+Object? _deepCopy(Object? v) => switch (v) {
+  final Map m => <String, dynamic>{for (final e in m.entries) '${e.key}': _deepCopy(e.value)},
+  final List l => [for (final e in l) _deepCopy(e)],
+  _ => v,
+};
+
+/// [current] with its off-peak part replaced, for showing a change before
+/// the car reports it.
+Map<String, dynamic> withOffPeak(Map current, OffPeakMode mode, int start, int end) => {
+  ...(_deepCopy(current) as Map<String, dynamic>),
+  'offpeakPowerInfo': {
+    'offPeakPowerFlag': offPeakFlag(mode),
+    'offPeakPowerTime1': {'starttime': bluelinkTime(start), 'endtime': bluelinkTime(end)},
+  },
+};

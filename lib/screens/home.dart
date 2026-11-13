@@ -79,15 +79,26 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  RollingNumber('${units.dist(car.rangeKm) ?? '–'}', style: Txt.display(34)),
-                  Text(' ${units.distance}', style: Txt.display(17)),
-                  const SizedBox(width: 12),
-                  Flexible(child: PixelBar(pct: soc)),
-                  const SizedBox(width: 12),
-                  RollingNumber('$soc%', style: Txt.display(17)),
-                  if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 18),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RollingNumber('${units.dist(car.rangeKm) ?? '–'}', style: Txt.display(34)),
+                      Text(' ${units.distance}', style: Txt.display(17)),
+                    ],
+                  ),
+                  PixelBar(pct: soc),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      RollingNumber('$soc%', style: Txt.display(17)),
+                      if (car.charging) const Icon(Icons.bolt, color: Palette.red, size: 18),
+                    ],
+                  ),
                 ],
               ),
               StaggerIn(index: 0, child: _Hero(onTap: () => Navigator.pushNamed(context, '/controls'))),

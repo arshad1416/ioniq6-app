@@ -84,8 +84,10 @@ class _ValetScreenState extends State<ValetScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('40 km/h', style: Txt.muted(15)),
-                Text('120 km/h', style: Txt.muted(15)),
+                Expanded(child: Text('40 km/h', style: Txt.muted(15))),
+                Expanded(
+                  child: Text('120 km/h', style: Txt.muted(15), textAlign: TextAlign.end),
+                ),
               ],
             ),
             Text(

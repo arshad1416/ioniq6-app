@@ -12,6 +12,7 @@ These functions block; call them from an executor.
 from __future__ import annotations
 
 import base64
+import copy
 import io
 import logging
 import time
@@ -32,6 +33,11 @@ SVM_LIMIT_ERRORS = {
     "7661": "This month's 360 camera requests are used up",
     "7662": "Today's 360 camera requests are used up",
 }
+
+
+# Bluelink's offPeakPowerFlag. The app's labels: 1 "Prioritize charging for
+# off-peak hours" (recommended), 2 "Charge only during off-peak hours".
+OFF_PEAK_FLAGS = {"off": 0, "prefer": 1, "only": 2}
 
 
 class BluelinkError(Exception):
@@ -129,8 +135,15 @@ class Bluelink:
             raise BluelinkError(SVM_LIMIT_ERRORS.get(code) or error.get("errorDesc") or f"Bluelink error {code}")
         return data
 
-    def _post(self, path: str, *, pin: bool = False, body: dict[str, Any] | None = None):
-        url, headers = self._api.API_URL + path, self._headers(pin)
+    def _post(
+        self,
+        path: str,
+        *,
+        pin: bool = False,
+        body: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ):
+        url, headers = self._api.API_URL + path, headers or self._headers(pin)
         if body is None:  # the app sends these with no body at all
             response = self._api.sessions.post(url, headers=headers, data=b"")
         else:
@@ -192,6 +205,46 @@ class Bluelink:
         if transaction:
             self._wait(transaction)
 
+    # Charge schedule -----------------------------------------------------------
+
+    def generation(self) -> str | None:
+        """The car's telematics generation as Bluelink reports it ("Gen3" or
+        another value). The phone app uses it to pick how to save a schedule."""
+        data, _ = self._post("vhcllst")
+        for vehicle in (data.get("result") or {}).get("vehicles") or []:
+            if str(vehicle.get("vehicleId")) == str(self._vehicle.id):
+                return vehicle.get("genHeaderType")
+        return None
+
+    def charge_schedule(self) -> dict[str, Any] | None:
+        """The schedule stored in the car, from kia_uvo's last status (no call)."""
+        data = getattr(self._vehicle, "data", None) or {}
+        info = ((data.get("status") or {}).get("evStatus") or {}).get("reservChargeInfos")
+        return info if isinstance(info, dict) else None
+
+    def set_off_peak(self, mode: str, start: str, end: str) -> None:
+        """A car command: sets the off-peak window ("HH:MM", 24-hour) and mode
+        (off, prefer, only), keeping the departures as they are. Sent the way
+        the phone app sends it for this car's generation."""
+        flag = OFF_PEAK_FLAGS[mode]
+        if (self.generation() or "").lower() == "gen3":
+            # PIN check first as a gate; the save itself carries no pAuth.
+            headers = self._headers(pin=False)
+            self._pin_token(headers)
+            body = {
+                "pin": self._pin,
+                "reservFlag": 0 if flag == 0 else 1,
+                "offpeakPowerFlag": flag,
+                "reservStartTime": bluelink_time(start),
+                "reservEndTime": bluelink_time(end),
+            }
+            self._post("v2/rc/ev/reschargeset", body=body, headers=headers)
+            return
+        current = self.charge_schedule()
+        if current is None:
+            raise BluelinkError("The car hasn't reported its schedule yet, so it can't be changed safely")
+        self._post("evc/srcfs", pin=True, body={"pin": self._pin, "reservChargeInfos": srcfs_schedule(current, flag, start, end)})
+
     # 360 camera ---------------------------------------------------------------
 
     def request_svm(self) -> None:
@@ -215,6 +268,36 @@ class Bluelink:
         if not image or len(size) < 6:
             return None
         return SvmShots(images=split_svm(image, size), taken=_parse_time(latest), raw=_without_image(latest))
+
+
+def bluelink_time(hhmm: str) -> dict[str, Any]:
+    """24-hour "HH:MM" as Bluelink's 12-hour time: {"time": "hhmm", "timeSection": 0 AM, 1 PM}."""
+    hour, minute = (int(p) for p in hhmm.split(":"))
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise ValueError(f"Not a time: {hhmm}")
+    return {"time": f"{hour % 12 or 12:02d}{minute:02d}", "timeSection": 1 if hour >= 12 else 0}
+
+
+def srcfs_schedule(current: dict[str, Any], flag: int, start: str, end: str) -> dict[str, Any]:
+    """The evc/srcfs schedule: the car's departures as they are, with a new
+    off-peak window. Like the app, both off-peak windows get the same times
+    and reservFlag follows the off-peak flag."""
+    window = {"starttime": bluelink_time(start), "endtime": bluelink_time(end)}
+    out: dict[str, Any] = {}
+    for key in ("reservChargeInfo", "reserveChargeInfo2"):
+        detail = copy.deepcopy((current.get(key) or {}).get("reservChargeInfoDetail"))
+        if isinstance(detail, dict):
+            fatc = detail.setdefault("reservFatcSet", {})
+            if isinstance(fatc, dict):
+                fatc.setdefault("heating1", 0)
+            out[key] = {"reservChargeInfoDetail": detail}
+    out["offpeakPowerInfo"] = {
+        "offPeakPowerFlag": flag,
+        "offPeakPowerTime1": window,
+        "offPeakPowerTime2": copy.deepcopy(window),
+    }
+    out["reservFlag"] = 0 if flag == 0 else 1
+    return out
 
 
 def _json(response: Any) -> dict[str, Any]:

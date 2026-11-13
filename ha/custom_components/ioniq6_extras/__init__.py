@@ -1,4 +1,5 @@
-"""Ioniq 6 Extras: parked location, valet mode and the 360 camera.
+"""Ioniq 6 Extras: parked location, valet mode, the 360 camera and the
+off-peak charging window.
 
 Bluelink Canada supports these, but the Hyundai / Kia Connect (kia_uvo)
 integration doesn't expose them. This borrows that integration's
@@ -14,7 +15,9 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
+import homeassistant.helpers.config_validation as cv
+import voluptuous as vol
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -22,7 +25,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .bluelink import Bluelink, BluelinkError, Location, SvmShots, ValetStatus
+from .bluelink import OFF_PEAK_FLAGS, Bluelink, BluelinkError, Location, SvmShots, ValetStatus
 from .const import DOMAIN, KIA_DOMAIN, POLL_MINUTES, SIGNAL_UPDATE
 
 _LOGGER = logging.getLogger(__name__)
@@ -136,6 +139,43 @@ class Extras(DataUpdateCoordinator[Snapshot]):
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
 
+    async def async_set_off_peak(self, mode: str, start: str, end: str) -> None:
+        try:
+            await self.hass.async_add_executor_job(self.bluelink.set_off_peak, mode, start, end)
+        except BluelinkError as err:
+            raise HomeAssistantError(f"Off-peak charging: {err}") from err
+        # Bluelink keeps the new schedule; have kia_uvo re-read its cached
+        # status (this doesn't wake the car) so the phone sees it.
+        try:
+            await self.hass.services.async_call(KIA_DOMAIN, "update", {}, blocking=False)
+        except Exception as err:  # noqa: BLE001 - the save itself worked
+            _LOGGER.debug("kia_uvo.update after the schedule change failed: %s", err)
+
+    async def async_schedule_info(self) -> dict[str, Any]:
+        """Read only: the car's generation and stored schedule, for checking
+        which request a schedule change will use."""
+        try:
+            generation = await self.hass.async_add_executor_job(self.bluelink.generation)
+        except BluelinkError as err:
+            raise HomeAssistantError(f"Couldn't read the car's generation: {err}") from err
+        return {
+            "generation": generation,
+            "request": "v2/rc/ev/reschargeset" if (generation or "").lower() == "gen3" else "evc/srcfs",
+            "schedule": self.bluelink.charge_schedule(),
+        }
+
+
+_TIME = vol.Match(r"^([01]\d|2[0-3]):[0-5]\d$")
+OFF_PEAK_SCHEMA = vol.Schema(
+    {
+        vol.Required("mode"): vol.In(list(OFF_PEAK_FLAGS)),
+        vol.Required("start"): vol.All(cv.string, _TIME),
+        vol.Required("end"): vol.All(cv.string, _TIME),
+    }
+)
+SERVICES = ("locate", "refresh", "take_360_shots", "set_off_peak_charging", "charge_schedule_info")
+
+
 def _is_vehicle_manager(obj: Any) -> bool:
     return all(hasattr(obj, a) for a in ("api", "token", "vehicles", "get_vehicle"))
 
@@ -199,7 +239,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "locate", locate)
     hass.services.async_register(DOMAIN, "refresh", refresh)
+    async def set_off_peak_charging(call: ServiceCall) -> None:
+        await extras.async_set_off_peak(call.data["mode"], call.data["start"], call.data["end"])
+
+    async def charge_schedule_info(_: ServiceCall) -> ServiceResponse:
+        return await extras.async_schedule_info()
+
     hass.services.async_register(DOMAIN, "take_360_shots", take_360_shots)
+    hass.services.async_register(DOMAIN, "set_off_peak_charging", set_off_peak_charging, schema=OFF_PEAK_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, "charge_schedule_info", charge_schedule_info, supports_response=SupportsResponse.ONLY
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
@@ -208,6 +258,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
-        for service in ("locate", "refresh", "take_360_shots"):
+        for service in SERVICES:
             hass.services.async_remove(DOMAIN, service)
     return ok

@@ -4,12 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../calendar/calendar.dart';
 import '../car/car_store.dart';
+import '../car/charge_schedule.dart';
 import '../car/settings.dart';
 import '../security/biometrics.dart';
 import '../theme.dart';
 import '../update/update_prompt.dart';
 import '../widgets/common.dart';
 import 'bluelink_setup.dart';
+import 'charge_schedule_sheet.dart';
 import '../widgets/line_icon.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -109,6 +111,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _soonRow(LineGlyph glyph, String label, {String? sub}) =>
       NavRow(glyph: LineIcon(glyph), label: label, sub: sub, value: 'Coming soon', onTap: () => _soon(label));
 
+  Widget _offPeakRow(ChargeSchedule? schedule) => NavRow(
+    glyph: const LineIcon(Glyphs.bolt),
+    label: 'Off-peak charging',
+    sub: switch (schedule?.mode) {
+      null => 'The car hasn\'t reported its schedule',
+      OffPeakMode.off => 'Charges whenever plugged in',
+      OffPeakMode.prefer => 'Prefers off-peak hours',
+      OffPeakMode.only => 'Only charges off-peak',
+    },
+    value: switch (schedule) {
+      null => 'Unknown',
+      ChargeSchedule(mode: OffPeakMode.off) => 'Off',
+      final s => s.window,
+    },
+    onTap: schedule == null ? null : () => _showSchedule(schedule),
+  );
+
+  Future<void> _showSchedule(ChargeSchedule s) => showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: Palette.raise,
+    isScrollControlled: true,
+    builder: (_) => ChargeScheduleSheet(schedule: s),
+  );
+
   Widget _switch(String title, String sub, bool value, ValueChanged<bool> onChanged) => SwitchListTile(
     title: Text(title, style: Txt.body(16)),
     subtitle: Text(sub, style: Txt.muted(14)),
@@ -169,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               sub: 'OnePlus 13 Bluetooth to IONIQ 6',
               value: car.phoneConnected ? 'Connected' : 'Not connected',
             ),
-            _soonRow(Glyphs.bolt, 'Off-peak charging', sub: 'Ontario ULO window, 23:00–07:00'),
+            _offPeakRow(car.chargeSchedule),
             const NavRow(glyph: LineIcon(Glyphs.brush), label: 'Car colour', value: 'Ultimate Red'),
             _switch(
               'Car commands',

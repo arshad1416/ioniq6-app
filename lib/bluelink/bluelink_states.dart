@@ -77,6 +77,20 @@ List<EntityState> statesFromBluelink(Map<String, dynamic> status, {({int? ac, in
   put(E.fastChargeMinutes, at_(['evStatus', 'remainTime2', 'etc1', 'value']));
   put(E.stationChargeMinutes, at_(['evStatus', 'remainTime2', 'etc3', 'value']));
 
+  // The charge schedule, where Home Assistant's raw-status sensor keeps it.
+  final schedule = at_(['evStatus', 'reservChargeInfos']);
+  if (schedule is Map) {
+    out.add(
+      EntityState(E.carData, 'on', {
+        'vehicle_data': {
+          'status': {
+            'evStatus': {'reservChargeInfos': schedule},
+          },
+        },
+      }, at),
+    );
+  }
+
   put(E.acLimit, limits?.ac);
   put(E.dcLimit, limits?.dc);
   return out;

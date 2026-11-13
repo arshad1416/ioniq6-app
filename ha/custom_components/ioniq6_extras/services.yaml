@@ -7,3 +7,34 @@ refresh:
 take_360_shots:
   name: Take new 360 shots
   description: Ask the car to take new 360 camera shots. Wakes the car and counts against Bluelink's daily and monthly limits.
+set_off_peak_charging:
+  name: Set off-peak charging
+  description: >-
+    A car command. Sets the car's off-peak charging window and how it uses it, keeping its
+    departure times. Sent with the Bluelink PIN, the same way the MyHyundai app sends it.
+  fields:
+    mode:
+      name: Mode
+      description: off (charge whenever plugged in), prefer (prioritize off-peak hours) or only (off-peak hours only).
+      required: true
+      example: prefer
+      selector:
+        select:
+          options: ["off", "prefer", "only"]
+    start:
+      name: Start
+      description: Start of the off-peak window, 24-hour HH:MM.
+      required: true
+      example: "23:00"
+      selector:
+        text:
+    end:
+      name: End
+      description: End of the off-peak window, 24-hour HH:MM.
+      required: true
+      example: "07:00"
+      selector:
+        text:
+charge_schedule_info:
+  name: Charge schedule info
+  description: Read only. The car's telematics generation, which request a schedule change would use, and the stored schedule.

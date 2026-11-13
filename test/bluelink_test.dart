@@ -7,9 +7,12 @@ import 'package:ioniq6_companion/bluelink/bluelink_client.dart';
 import 'package:ioniq6_companion/bluelink/bluelink_states.dart';
 import 'package:ioniq6_companion/car/car_state.dart';
 import 'package:ioniq6_companion/car/car_store.dart';
+import 'package:ioniq6_companion/car/charge_schedule.dart';
 import 'package:ioniq6_companion/car/commands.dart';
 import 'package:ioniq6_companion/car/health.dart';
 import 'package:ioniq6_companion/car/settings.dart';
+
+import 'charge_schedule_test.dart' show sample;
 
 const ok = {'responseCode': 0};
 Map<String, dynamic> fail(String code) => {
@@ -47,6 +50,8 @@ class FakeBluelink {
   bool wantOtp = false;
   int expiredAnswers = 0;
   int pending = 0;
+  String? generation;
+  Map<String, dynamic>? schedule;
 
   late final client = MockClient((request) async {
     final path = request.url.path.replaceFirst('/tods/api/', '');
@@ -71,7 +76,7 @@ class FakeBluelink {
       'vhcllst' => (
         result({
           'vehicles': [
-            {'vehicleId': 'car-1'},
+            {'vehicleId': 'car-1', 'genHeaderType': generation},
           ],
         }),
         const {},
@@ -80,7 +85,15 @@ class FakeBluelink {
         expiredAnswers--;
         return (fail('7403'), const <String, String>{});
       }(),
-      'lstvhclsts' || 'rltmvhclsts' => (result({'status': status}), const {}),
+      'lstvhclsts' || 'rltmvhclsts' => (
+        result({
+          'status': {
+            ...status,
+            if (schedule != null) 'evStatus': {...status['evStatus'] as Map, 'reservChargeInfos': schedule},
+          },
+        }),
+        const {},
+      ),
       'evc/selsoc' => (
         {
           'responseHeader': ok,
@@ -162,6 +175,67 @@ void main() {
     expect(headers['pAuth'], 'pauth');
     expect(body, {'pin': '1234'});
     expect(fake.requests.last.$2['transactionId'], 'tx-1');
+  });
+
+  group('off-peak window', () {
+    const cmd = SetOffPeakCommand(mode: OffPeakMode.only, start: 22 * 60 + 30, end: 6 * 60);
+
+    test('is saved with the whole schedule and the PIN token, keeping the departures', () async {
+      final fake = FakeBluelink()..schedule = sample();
+      final client = clientFor(fake);
+      await client.signIn();
+      await client.send(cmd);
+      final (_, headers, body) = fake.requests.firstWhere((r) => r.$1 == 'evc/srcfs');
+      expect(headers['pAuth'], 'pauth');
+      expect(body!['pin'], '1234');
+      final info = body['reservChargeInfos'] as Map;
+      final window = {
+        'starttime': {'time': '1030', 'timeSection': 1},
+        'endtime': {'time': '0600', 'timeSection': 0},
+      };
+      expect(info['offpeakPowerInfo'], {
+        'offPeakPowerFlag': 2,
+        'offPeakPowerTime1': window,
+        'offPeakPowerTime2': window,
+      });
+      expect(info['reservFlag'], 1);
+      final second = (info['reserveChargeInfo2'] as Map)['reservChargeInfoDetail'] as Map;
+      expect((second['reservInfo'] as Map)['time'], {'time': '0820', 'timeSection': 0});
+      expect((second['reservFatcSet'] as Map)['heating1'], 0);
+      // The app doesn't poll the car for a schedule change.
+      expect(fake.paths, isNot(contains('rmtsts')));
+    });
+
+    test('on a Gen3 car sends only the window, without the PIN token', () async {
+      final fake = FakeBluelink()..generation = 'Gen3';
+      final client = clientFor(fake);
+      await client.signIn();
+      await client.send(cmd);
+      expect(fake.paths.sublist(fake.paths.length - 2), ['vrfypin', 'v2/rc/ev/reschargeset']);
+      final (_, headers, body) = fake.requests.last;
+      expect(headers.containsKey('pAuth'), isFalse);
+      expect(body, {
+        'pin': '1234',
+        'reservFlag': 1,
+        'offpeakPowerFlag': 2,
+        'reservStartTime': {'time': '1030', 'timeSection': 1},
+        'reservEndTime': {'time': '0600', 'timeSection': 0},
+      });
+    });
+
+    test('is not sent when the car hasn\'t reported a schedule', () async {
+      final fake = FakeBluelink();
+      final client = clientFor(fake);
+      await client.signIn();
+      await expectLater(client.send(cmd), throwsA(isA<BluelinkException>()));
+      expect(fake.paths, isNot(contains('evc/srcfs')));
+    });
+
+    test('goes to the add-on through Home Assistant', () {
+      expect(cmd.domain, 'ioniq6_extras');
+      expect(cmd.service, 'set_off_peak_charging');
+      expect(cmd.data, {'mode': 'only', 'start': '22:30', 'end': '06:00'});
+    });
   });
 
   test('climate start carries the coded temperature and seats', () {

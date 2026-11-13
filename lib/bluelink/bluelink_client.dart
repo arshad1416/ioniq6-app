@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
+import '../car/charge_schedule.dart';
 import '../car/commands.dart';
 
 /// Bluelink answered with an error, or not at all.
@@ -339,6 +340,7 @@ class BluelinkClient {
   /// Sends [cmd] to the car and waits for the car to confirm it.
   Future<void> send(CarCommand cmd) async {
     final pin = _creds.pin;
+    if (cmd is SetOffPeakCommand) return _setOffPeak(cmd, pin);
     final (String path, Map<String, dynamic> extra) = switch (cmd) {
       LockCommand() => ('drlck', const {}),
       UnlockCommand() => ('drulck', const {}),
@@ -362,6 +364,37 @@ class BluelinkClient {
     final (_, headers) = await _post(path, body: {'pin': pin, ...extra}, pAuth: await _pinToken());
     final transaction = headers['transactionid'];
     if (transaction != null && transaction.isNotEmpty) await _waitFor(transaction);
+  }
+
+  /// The car's telematics generation ("Gen3" or another value), which
+  /// decides how a schedule is saved.
+  Future<String?> generation() async {
+    final (data, _) = await _post('vhcllst');
+    for (final v in ((data['result'] as Map?)?['vehicles'] as List?) ?? const []) {
+      if (v is Map && '${v['vehicleId']}' == session.vehicleId) return v['genHeaderType'] as String?;
+    }
+    return null;
+  }
+
+  /// As the MyHyundai app saves it: Gen3 cars take only the window, with
+  /// the PIN check as a gate; others take the whole schedule with pAuth. The
+  /// app doesn't wait on the car for either.
+  Future<void> _setOffPeak(SetOffPeakCommand cmd, String pin) async {
+    if ((await generation())?.toLowerCase() == 'gen3') {
+      await _pinToken();
+      await _post('v2/rc/ev/reschargeset', body: gen3ScheduleBody(pin, cmd.mode, cmd.start, cmd.end));
+      return;
+    }
+    final current = (await status())['evStatus'];
+    final info = current is Map ? current['reservChargeInfos'] : null;
+    if (info is! Map) {
+      throw BluelinkException('The car hasn\'t reported its schedule yet, so it can\'t be changed safely');
+    }
+    await _post(
+      'evc/srcfs',
+      body: {'pin': pin, 'reservChargeInfos': srcfsSchedule(info, cmd.mode, cmd.start, cmd.end)},
+      pAuth: await _pinToken(),
+    );
   }
 
   /// The body Bluelink expects for an EV climate start.

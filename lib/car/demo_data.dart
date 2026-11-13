@@ -8,6 +8,20 @@ Map<String, EntityState> demoStates() {
       EntityState(id, state, attrs, now.subtract(const Duration(hours: 2)));
   final today = DateTime(now.year, now.month, now.day);
   String day(int ago) => today.subtract(Duration(days: ago)).toIso8601String().substring(0, 10);
+  Map<String, dynamic> departure(String time) => {
+    'reservChargeInfoDetail': {
+      'reservInfo': {
+        'day': [1, 2, 3, 4, 5],
+        'time': {'time': time, 'timeSection': 0},
+      },
+      'reservChargeSet': true,
+      'reservFatcSet': {
+        'defrost': true,
+        'airTemp': {'value': '10H', 'unit': 0, 'hvacTempType': 1},
+        'airCtrl': 1,
+      },
+    },
+  };
   return {
     for (final e in [
       s(E.lock, 'locked'),
@@ -24,6 +38,26 @@ Map<String, EntityState> demoStates() {
         day(4): {'total_consumed': 775, 'climate_consumption': 51, 'regenerated_energy': 1214, 'distance': 8},
       }),
       s(E.location, 'home'),
+      s(E.carData, 'on', {
+        'vehicle_data': {
+          'status': {
+            'evStatus': {
+              'reservChargeInfos': {
+                'reservChargeInfo': departure('0700'),
+                'reserveChargeInfo2': departure('0820'),
+                'offpeakPowerInfo': {
+                  'offPeakPowerFlag': 1,
+                  'offPeakPowerTime1': {
+                    'starttime': {'time': '1100', 'timeSection': 1},
+                    'endtime': {'time': '0700', 'timeSection': 0},
+                  },
+                },
+                'reservFlag': 1,
+              },
+            },
+          },
+        },
+      }),
       s(E.preconditioning, 'off'),
       s(E.valet, 'off', {'maxSpeed': 80, 'maxSpeedUnit': 0}),
       s(E.parked, 'home', {'latitude': 43.65, 'longitude': -79.38, 'address': 'Home'}),

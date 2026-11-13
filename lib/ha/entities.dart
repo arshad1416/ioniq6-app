@@ -14,6 +14,10 @@ abstract final class E {
   static const dailyStats = 'sensor.ioniq_6_daily_driving_stats';
   static const location = 'device_tracker.ioniq_6_location';
 
+  /// The integration's raw last status; the app reads the car's charge
+  /// schedule from it (vehicle_data.status.evStatus.reservChargeInfos).
+  static const carData = 'sensor.ioniq_6_data';
+
   /// From the ioniq6_extras add-on (ha/custom_components): where the car was
   /// last parked, asked for when the phone leaves the car or on request, with
   /// the street address as an attribute.
@@ -102,6 +106,7 @@ abstract final class E {
     dtcCount,
     dailyStats,
     location,
+    carData,
     parked,
     valet,
     preconditioning,

@@ -7,7 +7,7 @@ Everything the phone app needs on the Home Assistant side lives here.
 | `automations/27_ioniq6_walkaway_lock.yaml` | Walk-away lock (dry run until you switch it off). |
 | `automations/28_ioniq6_locate_on_park.yaml` | Asks the car where it's parked when your phone leaves it. |
 | `automations/29_ioniq6_departure_prep.yaml` | Departure prep: 30 min before a timed Google Calendar event with a location, starts 15 min of climate. Dry run (notify only) unless the toggle helper `input_boolean.ioniq6_departure_prep_live` exists and is on. |
-| `custom_components/ioniq6_extras/` | The "Ioniq 6 Extras" add-on: parked location, valet mode, battery warming and the 360 camera. |
+| `custom_components/ioniq6_extras/` | The "Ioniq 6 Extras" add-on: parked location, valet mode, battery warming, the 360 camera and the off-peak charging window. |
 | `install.sh` | Copies all of it into `/opt/homeassistant`, backing up whatever it replaces. |
 
 ## Install or update (on the Pi)
@@ -35,5 +35,7 @@ still only one Bluelink sign-in.
 | `image.ioniq_6_360_front`, `_rear`, `_left`, `_right`, `_top` | The latest stored 360 shots. Re-read every 30 minutes and on `ioniq6_extras.refresh`. |
 | `switch.ioniq_6_battery_preconditioning` | Warms the battery for fast charging (Bluelink evc/prcndtngon, off). A car command. |
 | `ioniq6_extras.take_360_shots` | Asks the car for new shots. Wakes the car and counts against Bluelink's daily and monthly limits. |
+| `ioniq6_extras.set_off_peak_charging` | Sets the off-peak window (`start`, `end` as 24-hour `HH:MM`) and `mode` (`off`, `prefer`, `only`), keeping the departure times. A car command, sent as the MyHyundai app sends it: `evc/srcfs` with the whole schedule, or `v2/rc/ev/reschargeset` on a Gen3 car. |
+| `ioniq6_extras.charge_schedule_info` | Read only. Returns the car's generation, which of those two requests a change would use, and the stored schedule. |
 
 Tests for the Bluelink client: `python -m pytest ha/tests` (needs pytest and Pillow).
